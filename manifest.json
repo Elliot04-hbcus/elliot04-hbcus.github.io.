@@ -1,0 +1,13 @@
+{
+  "name": "HBCU Surge",
+  "short_name": "HBCU Surge",
+  "description": "SWAC and MEAC football and basketball scores, schedules and rosters.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#121212",
+  "theme_color": "#121212",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}
