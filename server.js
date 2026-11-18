@@ -732,7 +732,20 @@ const server = http.createServer(async function (req, res) {
       await handleFan(req, res, url);
       return;
     }
-
+    // Quick check you can open in a browser: /api/check
+    if (pathname === "/api/check") {
+      const testUrl = SOURCES["/api/site/"] + "football/college-football/scoreboard?groups=81&limit=1";
+      let report;
+      try {
+        const r = await fetch(testUrl);
+        const t = await r.text();
+        report = { status: r.status, starts: t.slice(0, 200), url: testUrl };
+      } catch (e) {
+        report = { error: String(e && e.message), cause: String(e && e.cause && (e.cause.code || e.cause.message)), url: testUrl };
+      }
+      sendJson(res, 200, report);
+      return;
+    }
     // Game data
     for (const prefix in SOURCES) {
       if (pathname.startsWith(prefix)) {
