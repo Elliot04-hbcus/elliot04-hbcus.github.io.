@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#121212">
+<meta name="color-scheme" content="light dark">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="HBCU Surge">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<title>Moderator | HBCU Surge</title>
+<meta name="robots" content="noindex">
+
+<script>
+/* Sets light or dark before the page paints, so there is no flash */
+(function () {
+  var mode = "auto";
+  try { mode = localStorage.getItem("hs-theme") || "auto"; } catch (e) {}
+  var dark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+  var resolved = mode === "auto" ? (dark ? "dark" : "light") : mode;
+  document.documentElement.setAttribute("data-theme", resolved);
+})();
+</script>
+
+<style>
+:root {
+  color-scheme: light;
+  --bg: #f2f2f2;
+  --card: #ffffff;
+  --card2: #f5f5f5;
+  --text: #111111;
+  --muted: #666666;
+  --line: #e6e6e6;
+  --thead: #121212;
+  --header: #121212;
+  --accent: #cc0000;
+  --field: #bbbbbb;
+  --hover: #ececec;
+  --active-bg: #fff4f4;
+  --error: #b00020;
+  --shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+  --bottom-h: 60px;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0e0e10;
+  --card: #1a1a1d;
+  --card2: #252529;
+  --text: #ececec;
+  --muted: #a3a3ab;
+  --line: #2c2c31;
+  --thead: #2a2a2f;
+  --header: #000000;
+  --accent: #e53935;
+  --field: #4a4a50;
+  --hover: #2a2a2f;
+  --active-bg: #2b1a1c;
+  --error: #ff7a8a;
+  --shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+[hidden] { display: none !important; }
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+
+button, input, select { font-family: inherit; font-size: 1rem; color: inherit; }
+button { cursor: pointer; touch-action: manipulation; }
+button, a { -webkit-tap-highlight-color: transparent; }
+
+/* ----- Header ----- */
+.site-header {
+  background: var(--header); color: #fff; padding: 1rem 2rem;
+  display: flex; justify-content: space-between; align-items: center;
+  flex-wrap: wrap; gap: 1rem;
+}
+.brand { font-size: 1.5rem; text-transform: uppercase; }
+.brand a { color: inherit; text-decoration: none; }
+.brand span { color: var(--accent); }
+.header-right { display: flex; align-items: center; gap: 0.6rem; }
+.view-tabs { display: flex; gap: 0.4rem; }
+.pill {
+  background: #2a2a2a; color: #ddd; border-radius: 999px; padding: 0.4rem 1rem;
+  font-size: 0.8rem; font-weight: 700; text-transform: uppercase; text-decoration: none; border: none;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.pill.active { background: var(--accent); color: #fff; }
+.theme-btn {
+  background: #2a2a2a; color: #fff; border: none; border-radius: 50%;
+  width: 36px; height: 36px; font-size: 1.1rem; line-height: 1;
+}
+
+.page { padding: 1.5rem 2rem 2rem; }
+h2 { margin-bottom: 0.8rem; font-size: 1.1rem; text-transform: uppercase; }
+h3 { margin-bottom: 0.6rem; font-size: 0.95rem; text-transform: uppercase; }
+.muted { color: var(--muted); font-size: 0.85rem; }
+
+.card { background: var(--card); border-radius: 8px; padding: 1.2rem; box-shadow: var(--shadow); }
+
+.notice {
+  background: var(--card); border-left: 6px solid var(--accent); border-radius: 8px;
+  padding: 1.2rem; max-width: 640px; margin: 0 auto;
+}
+.notice code { background: var(--card2); padding: 1px 6px; border-radius: 4px; }
+
+/* ----- Sign-in ----- */
+.auth-card { max-width: 440px; margin: 0 auto; }
+.auth-tabs { display: flex; gap: 0.3rem; margin-bottom: 1rem; border-bottom: 2px solid var(--line); }
+.auth-tab {
+  background: none; border: none; border-bottom: 3px solid transparent; margin-bottom: -2px;
+  padding: 0.6rem 1.1rem; color: var(--muted); font-weight: 700; text-transform: uppercase; font-size: 0.9rem;
+  min-height: 44px;
+}
+.auth-tab.active { color: var(--text); border-bottom-color: var(--accent); }
+
+label.field { display: block; margin-bottom: 0.9rem; font-size: 0.85rem; font-weight: 700; }
+label.field input {
+  display: block; width: 100%; margin-top: 0.3rem; padding: 0.7rem; min-height: 44px;
+  border: 1px solid var(--field); border-radius: 6px; font-weight: 400; font-size: 16px;
+  background: var(--card); color: var(--text);
+}
+.check { display: flex; gap: 0.6rem; align-items: flex-start; margin-bottom: 1rem; font-size: 0.82rem; }
+.check input { margin-top: 0.2rem; width: 20px; height: 20px; flex: 0 0 auto; }
+
+.btn {
+  background: var(--accent); color: #fff; border: none; border-radius: 6px;
+  padding: 0.6rem 1.1rem; font-weight: 700; text-transform: uppercase; font-size: 0.85rem; min-height: 44px;
+}
+.btn:disabled { opacity: 0.5; cursor: default; }
+.btn-dark { background: var(--thead); }
+.btn-plain { background: var(--card); color: var(--text); border: 1px solid var(--field); }
+.btn-wide { width: 100%; }
+
+.error { color: var(--error); font-size: 0.85rem; margin-top: 0.8rem; min-height: 1.1rem; }
+
+/* ----- Chat layout ----- */
+.chat-layout { display: grid; grid-template-columns: 300px 1fr; gap: 1.5rem; align-items: start; }
+.side-stack { display: grid; gap: 1rem; }
+
+.who { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; }
+.who strong { font-size: 1.1rem; word-break: break-all; }
+
+.fav-details summary { cursor: pointer; font-weight: 700; font-size: 0.85rem; text-transform: uppercase; min-height: 28px; }
+.fav-group { margin-top: 0.8rem; }
+.fav-group h4 { color: var(--accent); font-size: 0.75rem; margin-bottom: 0.3rem; letter-spacing: 0.04em; }
+.fav-item { display: flex; gap: 0.6rem; align-items: center; padding: 0.3rem 0; font-size: 0.95rem; }
+.fav-item input { width: 20px; height: 20px; }
+.fav-actions { margin-top: 0.9rem; display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap; }
+
+.room-btn {
+  display: block; width: 100%; text-align: left; background: var(--card2); color: var(--text); border: none;
+  border-left: 4px solid transparent; border-radius: 6px; padding: 0.7rem;
+  margin-bottom: 0.4rem; font-weight: 700; font-size: 0.9rem;
+}
+.room-btn:hover { background: var(--hover); }
+.room-btn.active { background: var(--active-bg); border-left-color: var(--accent); }
+.room-select {
+  width: 100%; margin-top: 0.4rem; padding: 0.6rem; min-height: 44px;
+  border: 1px solid var(--field); border-radius: 6px; font-size: 0.9rem;
+  background: var(--card); color: var(--text);
+}
+.room-picker { display: none; margin-bottom: 0.6rem; }
+
+/* ----- Chat panel ----- */
+.chat-head { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; flex-wrap: wrap; margin-bottom: 0.6rem; }
+.chat-head h2 { margin-bottom: 0; }
+
+.messages-wrap { position: relative; }
+.messages {
+  height: 55vh; min-height: 320px; overflow-y: auto; background: var(--bg);
+  border: 1px solid var(--line); border-radius: 8px; padding: 0.8rem;
+  -webkit-overflow-scrolling: touch; overscroll-behavior: contain;
+}
+.new-pill {
+  position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%);
+  background: var(--accent); color: #fff; border: none; border-radius: 999px;
+  padding: 0.5rem 1rem; font-size: 0.8rem; font-weight: 700; box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+}
+.empty-note { color: var(--muted); text-align: center; padding: 2rem 1rem; font-size: 0.9rem; }
+
+.msg {
+  background: var(--card); border-radius: 8px; padding: 0.55rem 0.8rem; margin-bottom: 0.5rem;
+  box-shadow: var(--shadow); border-left: 4px solid var(--line);
+}
+.msg.mine { border-left-color: var(--accent); }
+.msg-top { display: flex; align-items: baseline; gap: 0.5rem; flex-wrap: wrap; }
+.fan-tag {
+  background: var(--thead); color: #fff; border-radius: 4px; padding: 1px 6px;
+  font-size: 0.65rem; font-weight: 700; text-transform: uppercase;
+}
+.msg-time { margin-left: auto; color: var(--muted); font-size: 0.72rem; }
+.msg-text { margin-top: 0.2rem; white-space: pre-wrap; word-break: break-word; }
+.msg-actions { margin-top: 0.1rem; }
+.msg-actions button {
+  background: none; border: none; color: var(--muted); font-size: 0.75rem;
+  text-decoration: underline; padding: 0.35rem 0.4rem 0.35rem 0;
+}
+.msg-actions button:disabled { text-decoration: none; cursor: default; }
+
+.composer { display: flex; gap: 0.6rem; margin-top: 0.8rem; }
+.composer input {
+  flex: 1; padding: 0.65rem 0.8rem; min-height: 44px; border: 1px solid var(--field);
+  border-radius: 6px; min-width: 0; font-size: 16px; background: var(--card); color: var(--text);
+}
+.composer-info { display: flex; justify-content: space-between; gap: 1rem; margin-top: 0.4rem; font-size: 0.78rem; color: var(--muted); }
+.composer-note { color: var(--error); }
+.rules { margin-top: 1rem; font-size: 0.78rem; color: var(--muted); }
+
+.site-footer { padding: 1rem 2rem 2rem; color: var(--muted); font-size: 0.75rem; text-align: center; }
+
+/* ----- Bottom nav (phones) ----- */
+.bottom-nav {
+  display: none; position: fixed; left: 0; right: 0; bottom: 0; z-index: 30;
+  background: var(--header); border-top: 1px solid #2a2a2a;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.bottom-nav a {
+  flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  min-height: var(--bottom-h); color: #aaaaaa; font-size: 0.68rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.03em; text-decoration: none;
+}
+.bottom-nav a.active { color: #ff6b63; }
+.bottom-nav svg {
+  width: 24px; height: 24px; fill: none; stroke: currentColor;
+  stroke-width: 2; stroke-linejoin: round; stroke-linecap: round;
+}
+
+/* ----- ADDED: recovery code, blocking, admin link ----- */
+.recovery { border: 2px dashed var(--accent); border-radius: 8px; padding: 1rem; margin: 0.8rem 0; background: var(--card2); }
+.recovery code { display: block; font-size: 1.25rem; letter-spacing: 0.06em; margin: 0.5rem 0; word-break: break-all; font-weight: 800; }
+.btn-row { display: flex; gap: 0.6rem; flex-wrap: wrap; }
+.block-list { list-style: none; margin-top: 0.6rem; }
+.block-list li { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; padding: 0.2rem 0; font-size: 0.9rem; }
+.mini-btn { background: none; border: none; color: var(--accent); text-decoration: underline; font-size: 0.8rem; min-height: 36px; }
+.auth-link { color: var(--accent); }
+.site-footer a, .rules a { color: var(--muted); }
+:focus-visible { outline: 3px solid #2f7df6; outline-offset: 2px; }
+
+/* ----- Phones ----- */
+@media (max-width: 700px) {
+  body { padding-bottom: calc(var(--bottom-h) + env(safe-area-inset-bottom)); }
+  body.kb-open { padding-bottom: 0; }
+  body.kb-open .bottom-nav { display: none; }
+
+  .site-header { padding: 0.7rem 1rem; flex-wrap: nowrap; }
+  .brand { font-size: 1.25rem; }
+  .view-tabs { display: none; }
+  .theme-btn { width: 44px; height: 44px; }
+  .bottom-nav { display: flex; }
+
+  .page { padding: 0.8rem; }
+  .chat-layout { display: flex; flex-direction: column; gap: 0.7rem; }
+  .side-stack { gap: 0.7rem; }
+  .side-stack .card { padding: 0.8rem; }
+  .rooms-card { display: none; }
+  .room-picker { display: block; }
+  .room-picker .room-select { margin-top: 0; }
+
+  .chat-card {
+    display: flex; flex-direction: column; padding: 0.8rem;
+    height: max(440px, calc(100vh - 330px));
+    height: max(440px, calc(100dvh - 330px));
+  }
+  .chat-head { margin-bottom: 0.4rem; }
+  .chat-head h2 { font-size: 1rem; }
+  .messages-wrap { flex: 1; min-height: 0; }
+  .messages { height: 100%; min-height: 0; }
+  .rules { display: none; }
+  .site-footer { display: none; }
+  .auth-card { padding: 1rem; }
+}
+
+/* ----- policy + admin pages ----- */
+.policy { max-width: 760px; margin: 0 auto; }
+.policy h1 { font-size: 1.5rem; margin-bottom: 0.6rem; }
+.policy h2 { margin-top: 1.4rem; text-transform: none; }
+.policy p, .policy li { line-height: 1.6; margin-bottom: 0.6rem; }
+.policy ul { padding-left: 1.3rem; }
+.policy a { color: var(--accent); }
+.admin-wrap { max-width: 980px; margin: 0 auto; display: grid; gap: 1rem; }
+.admin-table { width: 100%; border-collapse: collapse; background: var(--card); }
+.admin-table th, .admin-table td { padding: 0.5rem; text-align: left; border-bottom: 1px solid var(--line); font-size: 0.85rem; vertical-align: top; }
+.admin-table th { background: var(--thead); color: #fff; text-transform: uppercase; font-size: 0.75rem; }
+.admin-table .btn { min-height: 36px; padding: 0.3rem 0.7rem; font-size: 0.75rem; }
+.btn-danger { background: #8a1c1c; }
+.btn-row { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+.site-footer a { color: var(--muted); }
+@media (max-width: 700px) { .admin-scroll { overflow-x: auto; } }
+</style>
+</head>
+
+<body>
+
+<header class="site-header">
+  <h1 class="brand"><a href="/">HBCU <span>Surge</span></a></h1>
+  <div class="header-right">
+    <nav class="view-tabs">
+      <a class="pill" href="/">Scores</a>
+      <a class="pill" href="/#teams">Teams</a>
+      <a class="pill" href="/#standings">Standings</a>      <a class="pill" href="/fan-talk">Fan Talk</a>
+    </nav>
+    <button id="theme-btn" class="theme-btn" aria-label="Change theme" title="Change theme">&#9680;</button>
+  </div>
+</header>
+
+<main class="page">
+<div class="admin-wrap">
+  <p id="admin-error" class="error" role="alert"></p>
+  <section class="card"><h2>Reported messages</h2>
+    <p class="muted" style="margin-bottom:0.6rem">A message with 3 reports is hidden automatically. "Keep" clears the reports and shows it again.</p>
+    <div id="reported"></div></section>
+  <section class="card"><h2>Users</h2><div id="users"></div></section>
+</div>
+</main>
+
+<footer class="site-footer"><p><a href="rules.html">Community rules</a> &middot; <a href="privacy.html">Privacy</a></p></footer>
+
+<nav class="bottom-nav" aria-label="Main">
+  <a href="/">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 4v16"/></svg>
+    <span>Scores</span>
+  </a>
+  <a href="/#teams">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/></svg>
+    <span>Teams</span>
+  </a>
+  <a href="/#standings">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20V11M12 20V4M19 20v-6"/></svg>
+    <span>Standings</span>
+  </a>
+  <a href="/fan-talk">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"/></svg>
+    <span>Fan Talk</span>
+  </a>
+</nav>
+
+<script>
+function $(id) { return document.getElementById(id); }
+function esc(t) { return String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
+var ICONS = { auto: "\u25D0", light: "\u2600", dark: "\u263E" };
+function themeMode() { try { return localStorage.getItem("hs-theme") || "auto"; } catch (e) { return "auto"; } }
+function applyTheme(mode) {
+  var dark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+  document.documentElement.setAttribute("data-theme", mode === "auto" ? (dark ? "dark" : "light") : mode);
+  $("theme-btn").textContent = ICONS[mode];
+}
+$("theme-btn").addEventListener("click", function () {
+  var order = ["auto", "light", "dark"], next = order[(order.indexOf(themeMode()) + 1) % 3];
+  try { localStorage.setItem("hs-theme", next); } catch (e) {}
+  applyTheme(next);
+});
+applyTheme(themeMode());
+fetch("/fan/config").then(function (r) { return r.ok ? r.json() : {}; }).then(function (d) {
+  Array.prototype.forEach.call(document.querySelectorAll("[data-contact]"), function (el) { el.textContent = d.contact || "the site owner"; });
+}).catch(function () {});
+</script>
+<script>
+function post(path, body) {
+  return fetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
+    .then(function (r) { return r.json().catch(function () { return {}; }).then(function (d) { return { ok: r.ok, data: d }; }); });
+}
+function load() {
+  fetch("/fan/admin/overview").then(function (r) {
+    if (r.status === 401 || r.status === 403) throw new Error("Log in on Fan Talk with an account listed in ADMIN_USERS, then come back to this page.");
+    if (!r.ok) throw new Error("Could not load the moderator data.");
+    return r.json();
+  }).then(function (d) {
+    $("admin-error").textContent = "";
+    $("reported").innerHTML = d.reported.length === 0 ? "<p>Nothing has been reported.</p>" :
+      '<div class="admin-scroll"><table class="admin-table"><thead><tr><th>User</th><th>Message</th><th>Reports</th><th>Actions</th></tr></thead><tbody>' +
+      d.reported.map(function (m) {
+        return "<tr><td>" + esc(m.user) + "<br><small>" + esc(new Date(m.time).toLocaleString()) + "</small></td><td>" + esc(m.text) +
+          (m.hidden ? " <em>(hidden)</em>" : "") + "</td><td>" + m.reports + '</td><td><div class="btn-row">' +
+          '<button class="btn btn-plain" data-act="dismiss" data-id="' + m.id + '">Keep</button>' +
+          '<button class="btn btn-danger" data-act="delete" data-id="' + m.id + '">Delete</button>' +
+          '<button class="btn btn-danger" data-act="ban" data-user="' + esc(m.user) + '">Suspend user</button></div></td></tr>';
+      }).join("") + "</tbody></table></div>";
+    $("users").innerHTML = '<div class="admin-scroll"><table class="admin-table"><thead><tr><th>User</th><th>Joined</th><th>Actions</th></tr></thead><tbody>' +
+      d.users.map(function (u) {
+        return "<tr><td>" + esc(u.username) + (u.banned ? " <em>(suspended)</em>" : "") + (u.admin ? " <em>(moderator)</em>" : "") + "</td><td>" +
+          esc(new Date(u.created).toLocaleDateString()) + '</td><td><div class="btn-row">' +
+          (u.banned ? '<button class="btn btn-plain" data-act="unban" data-user="' + esc(u.username) + '">Restore</button>'
+                    : '<button class="btn btn-danger" data-act="ban" data-user="' + esc(u.username) + '">Suspend</button>') +
+          '<button class="btn btn-plain" data-act="reset-password" data-user="' + esc(u.username) + '">Reset password</button></div></td></tr>';
+      }).join("") + "</tbody></table></div>";
+  }).catch(function (e) { $("admin-error").textContent = e.message; $("reported").innerHTML = ""; $("users").innerHTML = ""; });
+}
+document.addEventListener("click", function (event) {
+  var b = event.target.closest("[data-act]");
+  if (!b) return;
+  var act = b.getAttribute("data-act");
+  if ((act === "ban" || act === "delete") && !window.confirm("Are you sure?")) return;
+  post("/fan/admin/" + act, { id: b.getAttribute("data-id"), username: b.getAttribute("data-user") }).then(function (res) {
+    if (!res.ok) { $("admin-error").textContent = res.data.error || "That didn't work."; return; }
+    if (res.data.temporaryPassword) window.alert("Temporary password (tell the person privately; it is shown only once):\n\n" + res.data.temporaryPassword);
+    load();
+  });
+});
+load();
+</script>
+</body>
+</html>

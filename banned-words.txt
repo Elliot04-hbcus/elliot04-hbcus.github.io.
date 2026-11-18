@@ -1,0 +1,2 @@
+# Words blocked in chat and usernames (one per line, lowercase).
+# Restart the server after editing. Empty on purpose: add your own.

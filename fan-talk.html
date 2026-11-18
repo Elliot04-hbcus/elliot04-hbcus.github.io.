@@ -1,0 +1,1083 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#121212">
+<meta name="color-scheme" content="light dark">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="HBCU Surge">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<title>Fan Talk | HBCU Surge</title>
+
+<script>
+/* Sets light or dark before the page paints, so there is no flash */
+(function () {
+  var mode = "auto";
+  try { mode = localStorage.getItem("hs-theme") || "auto"; } catch (e) {}
+  var dark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+  var resolved = mode === "auto" ? (dark ? "dark" : "light") : mode;
+  document.documentElement.setAttribute("data-theme", resolved);
+})();
+</script>
+
+<style>
+:root {
+  color-scheme: light;
+  --bg: #f2f2f2;
+  --card: #ffffff;
+  --card2: #f5f5f5;
+  --text: #111111;
+  --muted: #666666;
+  --line: #e6e6e6;
+  --thead: #121212;
+  --header: #121212;
+  --accent: #cc0000;
+  --field: #bbbbbb;
+  --hover: #ececec;
+  --active-bg: #fff4f4;
+  --error: #b00020;
+  --shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+  --bottom-h: 60px;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0e0e10;
+  --card: #1a1a1d;
+  --card2: #252529;
+  --text: #ececec;
+  --muted: #a3a3ab;
+  --line: #2c2c31;
+  --thead: #2a2a2f;
+  --header: #000000;
+  --accent: #e53935;
+  --field: #4a4a50;
+  --hover: #2a2a2f;
+  --active-bg: #2b1a1c;
+  --error: #ff7a8a;
+  --shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+[hidden] { display: none !important; }
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+
+button, input, select { font-family: inherit; font-size: 1rem; color: inherit; }
+button { cursor: pointer; touch-action: manipulation; }
+button, a { -webkit-tap-highlight-color: transparent; }
+
+/* ----- Header ----- */
+.site-header {
+  background: var(--header); color: #fff; padding: 1rem 2rem;
+  display: flex; justify-content: space-between; align-items: center;
+  flex-wrap: wrap; gap: 1rem;
+}
+.brand { font-size: 1.5rem; text-transform: uppercase; }
+.brand a { color: inherit; text-decoration: none; }
+.brand span { color: var(--accent); }
+.header-right { display: flex; align-items: center; gap: 0.6rem; }
+.view-tabs { display: flex; gap: 0.4rem; }
+.pill {
+  background: #2a2a2a; color: #ddd; border-radius: 999px; padding: 0.4rem 1rem;
+  font-size: 0.8rem; font-weight: 700; text-transform: uppercase; text-decoration: none; border: none;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.pill.active { background: var(--accent); color: #fff; }
+.theme-btn {
+  background: #2a2a2a; color: #fff; border: none; border-radius: 50%;
+  width: 36px; height: 36px; font-size: 1.1rem; line-height: 1;
+}
+
+.page { padding: 1.5rem 2rem 2rem; }
+h2 { margin-bottom: 0.8rem; font-size: 1.1rem; text-transform: uppercase; }
+h3 { margin-bottom: 0.6rem; font-size: 0.95rem; text-transform: uppercase; }
+.muted { color: var(--muted); font-size: 0.85rem; }
+
+.card { background: var(--card); border-radius: 8px; padding: 1.2rem; box-shadow: var(--shadow); }
+
+.notice {
+  background: var(--card); border-left: 6px solid var(--accent); border-radius: 8px;
+  padding: 1.2rem; max-width: 640px; margin: 0 auto;
+}
+.notice code { background: var(--card2); padding: 1px 6px; border-radius: 4px; }
+
+/* ----- Sign-in ----- */
+.auth-card { max-width: 440px; margin: 0 auto; }
+.auth-tabs { display: flex; gap: 0.3rem; margin-bottom: 1rem; border-bottom: 2px solid var(--line); }
+.auth-tab {
+  background: none; border: none; border-bottom: 3px solid transparent; margin-bottom: -2px;
+  padding: 0.6rem 1.1rem; color: var(--muted); font-weight: 700; text-transform: uppercase; font-size: 0.9rem;
+  min-height: 44px;
+}
+.auth-tab.active { color: var(--text); border-bottom-color: var(--accent); }
+
+label.field { display: block; margin-bottom: 0.9rem; font-size: 0.85rem; font-weight: 700; }
+label.field input {
+  display: block; width: 100%; margin-top: 0.3rem; padding: 0.7rem; min-height: 44px;
+  border: 1px solid var(--field); border-radius: 6px; font-weight: 400; font-size: 16px;
+  background: var(--card); color: var(--text);
+}
+.check { display: flex; gap: 0.6rem; align-items: flex-start; margin-bottom: 1rem; font-size: 0.82rem; }
+.check input { margin-top: 0.2rem; width: 20px; height: 20px; flex: 0 0 auto; }
+
+.btn {
+  background: var(--accent); color: #fff; border: none; border-radius: 6px;
+  padding: 0.6rem 1.1rem; font-weight: 700; text-transform: uppercase; font-size: 0.85rem; min-height: 44px;
+}
+.btn:disabled { opacity: 0.5; cursor: default; }
+.btn-dark { background: var(--thead); }
+.btn-plain { background: var(--card); color: var(--text); border: 1px solid var(--field); }
+.btn-wide { width: 100%; }
+
+.error { color: var(--error); font-size: 0.85rem; margin-top: 0.8rem; min-height: 1.1rem; }
+
+/* ----- Chat layout ----- */
+.chat-layout { display: grid; grid-template-columns: 300px 1fr; gap: 1.5rem; align-items: start; }
+.side-stack { display: grid; gap: 1rem; }
+
+.who { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; }
+.who strong { font-size: 1.1rem; word-break: break-all; }
+
+.fav-details summary { cursor: pointer; font-weight: 700; font-size: 0.85rem; text-transform: uppercase; min-height: 28px; }
+.fav-group { margin-top: 0.8rem; }
+.fav-group h4 { color: var(--accent); font-size: 0.75rem; margin-bottom: 0.3rem; letter-spacing: 0.04em; }
+.fav-item { display: flex; gap: 0.6rem; align-items: center; padding: 0.3rem 0; font-size: 0.95rem; }
+.fav-item input { width: 20px; height: 20px; }
+.fav-actions { margin-top: 0.9rem; display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap; }
+
+.room-btn {
+  display: block; width: 100%; text-align: left; background: var(--card2); color: var(--text); border: none;
+  border-left: 4px solid transparent; border-radius: 6px; padding: 0.7rem;
+  margin-bottom: 0.4rem; font-weight: 700; font-size: 0.9rem;
+}
+.room-btn:hover { background: var(--hover); }
+.room-btn.active { background: var(--active-bg); border-left-color: var(--accent); }
+.room-select {
+  width: 100%; margin-top: 0.4rem; padding: 0.6rem; min-height: 44px;
+  border: 1px solid var(--field); border-radius: 6px; font-size: 0.9rem;
+  background: var(--card); color: var(--text);
+}
+.room-picker { display: none; margin-bottom: 0.6rem; }
+
+/* ----- Chat panel ----- */
+.chat-head { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; flex-wrap: wrap; margin-bottom: 0.6rem; }
+.chat-head h2 { margin-bottom: 0; }
+
+.messages-wrap { position: relative; }
+.messages {
+  height: 55vh; min-height: 320px; overflow-y: auto; background: var(--bg);
+  border: 1px solid var(--line); border-radius: 8px; padding: 0.8rem;
+  -webkit-overflow-scrolling: touch; overscroll-behavior: contain;
+}
+.new-pill {
+  position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%);
+  background: var(--accent); color: #fff; border: none; border-radius: 999px;
+  padding: 0.5rem 1rem; font-size: 0.8rem; font-weight: 700; box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+}
+.empty-note { color: var(--muted); text-align: center; padding: 2rem 1rem; font-size: 0.9rem; }
+
+.msg {
+  background: var(--card); border-radius: 8px; padding: 0.55rem 0.8rem; margin-bottom: 0.5rem;
+  box-shadow: var(--shadow); border-left: 4px solid var(--line);
+}
+.msg.mine { border-left-color: var(--accent); }
+.msg-top { display: flex; align-items: baseline; gap: 0.5rem; flex-wrap: wrap; }
+.fan-tag {
+  background: var(--thead); color: #fff; border-radius: 4px; padding: 1px 6px;
+  font-size: 0.65rem; font-weight: 700; text-transform: uppercase;
+}
+.msg-time { margin-left: auto; color: var(--muted); font-size: 0.72rem; }
+.msg-text { margin-top: 0.2rem; white-space: pre-wrap; word-break: break-word; }
+.msg-actions { margin-top: 0.1rem; }
+.msg-actions button {
+  background: none; border: none; color: var(--muted); font-size: 0.75rem;
+  text-decoration: underline; padding: 0.35rem 0.4rem 0.35rem 0;
+}
+.msg-actions button:disabled { text-decoration: none; cursor: default; }
+
+.composer { display: flex; gap: 0.6rem; margin-top: 0.8rem; }
+.composer input {
+  flex: 1; padding: 0.65rem 0.8rem; min-height: 44px; border: 1px solid var(--field);
+  border-radius: 6px; min-width: 0; font-size: 16px; background: var(--card); color: var(--text);
+}
+.composer-info { display: flex; justify-content: space-between; gap: 1rem; margin-top: 0.4rem; font-size: 0.78rem; color: var(--muted); }
+.composer-note { color: var(--error); }
+.rules { margin-top: 1rem; font-size: 0.78rem; color: var(--muted); }
+
+.site-footer { padding: 1rem 2rem 2rem; color: var(--muted); font-size: 0.75rem; text-align: center; }
+
+/* ----- Bottom nav (phones) ----- */
+.bottom-nav {
+  display: none; position: fixed; left: 0; right: 0; bottom: 0; z-index: 30;
+  background: var(--header); border-top: 1px solid #2a2a2a;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.bottom-nav a {
+  flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  min-height: var(--bottom-h); color: #aaaaaa; font-size: 0.68rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.03em; text-decoration: none;
+}
+.bottom-nav a.active { color: #ff6b63; }
+.bottom-nav svg {
+  width: 24px; height: 24px; fill: none; stroke: currentColor;
+  stroke-width: 2; stroke-linejoin: round; stroke-linecap: round;
+}
+
+/* ----- ADDED: recovery code, blocking, admin link ----- */
+.recovery { border: 2px dashed var(--accent); border-radius: 8px; padding: 1rem; margin: 0.8rem 0; background: var(--card2); }
+.recovery code { display: block; font-size: 1.25rem; letter-spacing: 0.06em; margin: 0.5rem 0; word-break: break-all; font-weight: 800; }
+.btn-row { display: flex; gap: 0.6rem; flex-wrap: wrap; }
+.block-list { list-style: none; margin-top: 0.6rem; }
+.block-list li { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; padding: 0.2rem 0; font-size: 0.9rem; }
+.mini-btn { background: none; border: none; color: var(--accent); text-decoration: underline; font-size: 0.8rem; min-height: 36px; }
+.auth-link { color: var(--accent); }
+.site-footer a, .rules a { color: var(--muted); }
+:focus-visible { outline: 3px solid #2f7df6; outline-offset: 2px; }
+
+/* ----- Phones ----- */
+@media (max-width: 700px) {
+  body { padding-bottom: calc(var(--bottom-h) + env(safe-area-inset-bottom)); }
+  body.kb-open { padding-bottom: 0; }
+  body.kb-open .bottom-nav { display: none; }
+
+  .site-header { padding: 0.7rem 1rem; flex-wrap: nowrap; }
+  .brand { font-size: 1.25rem; }
+  .view-tabs { display: none; }
+  .theme-btn { width: 44px; height: 44px; }
+  .bottom-nav { display: flex; }
+
+  .page { padding: 0.8rem; }
+  .chat-layout { display: flex; flex-direction: column; gap: 0.7rem; }
+  .side-stack { gap: 0.7rem; }
+  .side-stack .card { padding: 0.8rem; }
+  .rooms-card { display: none; }
+  .room-picker { display: block; }
+  .room-picker .room-select { margin-top: 0; }
+
+  .chat-card {
+    display: flex; flex-direction: column; padding: 0.8rem;
+    height: max(440px, calc(100vh - 330px));
+    height: max(440px, calc(100dvh - 330px));
+  }
+  .chat-head { margin-bottom: 0.4rem; }
+  .chat-head h2 { font-size: 1rem; }
+  .messages-wrap { flex: 1; min-height: 0; }
+  .messages { height: 100%; min-height: 0; }
+  .rules { display: none; }
+  .site-footer { display: none; }
+  .auth-card { padding: 1rem; }
+}
+</style>
+</head>
+
+<body>
+
+<header class="site-header">
+  <h1 class="brand"><a href="/">HBCU <span>Surge</span></a></h1>
+  <div class="header-right">
+    <nav class="view-tabs">
+      <a class="pill" href="/">Scores</a>
+      <a class="pill" href="/#teams">Teams</a>
+      <a class="pill" href="/#standings">Standings</a>      <a class="pill active" href="/fan-talk">Fan Talk</a>
+    </nav>
+    <button id="theme-btn" class="theme-btn" aria-label="Change theme" title="Change theme">&#9680;</button>
+  </div>
+</header>
+
+<main class="page">
+
+  <!-- Shown if the helper server isn't reachable -->
+  <div id="server-problem" class="notice" hidden>
+    <h2>Fan Talk needs the helper server</h2>
+    <p>In the VS Code terminal, run <code>node server.js</code>, then open
+       <code>http://localhost:3000/fan-talk</code> in your browser.</p>
+  </div>
+
+  <!-- Signed out: log in or sign up -->
+  <section id="auth-view" class="auth-card card" hidden>
+    <div class="auth-tabs">
+      <button class="auth-tab active" data-mode="login">Log in</button>
+      <button class="auth-tab" data-mode="signup">Sign up</button>
+      <button class="auth-tab" data-mode="recover">Forgot?</button>
+    </div>
+
+    <form id="login-form" autocomplete="on">
+      <label class="field">Username
+        <input id="login-username" type="text" autocomplete="username" autocapitalize="none" required>
+      </label>
+      <label class="field">Password
+        <input id="login-password" type="password" autocomplete="current-password" required>
+      </label>
+      <button class="btn btn-wide" type="submit">Log in</button>
+    </form>
+
+    <form id="signup-form" autocomplete="on" hidden>
+      <label class="field">Choose a username
+        <input id="signup-username" type="text" autocomplete="username" autocapitalize="none" maxlength="20" required>
+        <span class="muted">3 to 20 characters: letters, numbers, underscores.</span>
+      </label>
+      <label class="field">Choose a password
+        <input id="signup-password" type="password" autocomplete="new-password" minlength="8" required>
+        <span class="muted">At least 8 characters.</span>
+      </label>
+      <label class="check">
+        <input id="signup-age" type="checkbox">
+        <span>I am 13 or older and I agree to be respectful in chat: no hate, harassment,
+              threats, or sharing private information. See the <a class="auth-link" href="rules.html" target="_blank">rules</a>
+              and <a class="auth-link" href="privacy.html" target="_blank">privacy policy</a>.</span>
+      </label>
+      <button class="btn btn-wide" type="submit">Create account</button>
+    </form>
+
+    <form id="recover-form" autocomplete="off" hidden>
+      <p class="muted" style="margin-bottom:0.8rem">Enter the recovery code you were shown when you created your account.</p>
+      <label class="field">Username
+        <input id="recover-username" type="text" autocomplete="username" autocapitalize="none" required>
+      </label>
+      <label class="field">Recovery code
+        <input id="recover-code" type="text" autocomplete="off" autocapitalize="characters" required>
+      </label>
+      <label class="field">New password
+        <input id="recover-password" type="password" autocomplete="new-password" minlength="8" required>
+      </label>
+      <button class="btn btn-wide" type="submit">Reset password</button>
+    </form>
+
+    <p id="auth-error" class="error" role="alert"></p>
+  </section>
+
+  <!-- Shown once, right after sign-up or a password reset -->
+  <section id="recovery-view" class="auth-card card" hidden>
+    <h2>Save your recovery code</h2>
+    <p>This is the only way back in if you forget your password, and it can't be shown again. Write it down or save it somewhere safe.</p>
+    <div class="recovery"><code id="recovery-code"></code></div>
+    <div class="btn-row">
+      <button id="recovery-copy" class="btn btn-plain" type="button">Copy code</button>
+      <button id="recovery-done" class="btn" type="button">I saved it</button>
+    </div>
+  </section>
+
+  <!-- Signed in: favorites, rooms, chat -->
+  <section id="chat-view" class="chat-layout" hidden>
+
+    <aside class="side-stack">
+      <div class="card">
+        <div class="who">
+          <div>
+            <span class="muted">Signed in as</span><br>
+            <strong id="who"></strong>
+          </div>
+          <button id="logout" class="btn btn-plain">Log out</button>
+        </div>
+        <p style="margin-top:0.6rem"><a id="admin-link" class="auth-link" href="/admin" hidden>Moderator page</a></p>
+      </div>
+
+      <div class="card">
+        <details id="fav-details" class="fav-details">
+          <summary>My favorite teams</summary>
+          <p class="muted" id="fav-help" style="margin-top:0.6rem"></p>
+          <div id="fav-list"></div>
+          <div class="fav-actions">
+            <button id="fav-save" class="btn btn-dark">Save teams</button>
+            <span id="fav-note" class="muted"></span>
+          </div>
+        </details>
+        <p id="fav-summary" class="muted" style="margin-top:0.6rem"></p>
+      </div>
+
+      <div class="card">
+        <details>
+          <summary style="cursor:pointer;font-weight:700;font-size:0.85rem;text-transform:uppercase;min-height:28px">Blocked users</summary>
+          <ul id="block-list" class="block-list"></ul>
+        </details>
+      </div>
+
+      <div class="card rooms-card">
+        <h3>Chat rooms</h3>
+        <div id="rooms"></div>
+        <select id="other-room" class="room-select" aria-label="Visit another team's room"></select>
+      </div>
+    </aside>
+
+    <section class="card chat-card">
+      <div class="chat-head">
+        <h2 id="room-title">Fan Lounge</h2>
+        <span class="muted" id="room-sub"></span>
+      </div>
+
+      <!-- Phones: pick a room here instead of the sidebar -->
+      <div class="room-picker">
+        <select id="room-select" class="room-select" aria-label="Choose a chat room"></select>
+      </div>
+
+      <div class="messages-wrap">
+        <div id="messages" class="messages" aria-live="polite"></div>
+        <button id="new-pill" class="new-pill" hidden>New messages &darr;</button>
+      </div>
+
+      <form id="composer" class="composer" autocomplete="off">
+        <input id="message-input" type="text" placeholder="Say something to the fans..." maxlength="300" enterkeyhint="send">
+        <button id="send-btn" class="btn" type="submit">Send</button>
+      </form>
+      <div class="composer-info">
+        <span id="composer-note" class="composer-note"></span>
+        <span id="char-count">0 / 300</span>
+      </div>
+
+      <p class="rules">Be respectful. Don't share personal information. Use Report on anything
+        that breaks the <a href="rules.html">rules</a>: a message is hidden after 3 reports. Use Block to hide
+        someone's messages from you.</p>
+    </section>
+
+  </section>
+</main>
+
+<footer class="site-footer">
+  <p>Fan Talk is a community space. This site is independent and is not affiliated with any conference or school.</p>
+  <p><a href="rules.html">Community rules</a> &middot; <a href="privacy.html">Privacy</a> &middot; <span id="contact-line"></span></p>
+</footer>
+
+<nav class="bottom-nav" aria-label="Main">
+  <a href="/">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 4v16"/></svg>
+    <span>Scores</span>
+  </a>
+  <a href="/#teams">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/></svg>
+    <span>Teams</span>
+  </a>
+  <a href="/#standings">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20V11M12 20V4M19 20v-6"/></svg>
+    <span>Standings</span>
+  </a>
+  <a class="active" href="/fan-talk">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"/></svg>
+    <span>Fan Talk</span>
+  </a>
+</nav>
+
+
+<script>
+/* =====================================================================
+   Fan Talk - all JavaScript
+   Sections: 1 Helpers  2 Theme  3 Sign-in  4 Favorites  5 Rooms
+             6 Chat  7 Start
+   ===================================================================== */
+
+/* ---------- 1. HELPERS ---------- */
+function $(id) { return document.getElementById(id); }
+
+function esc(text) {
+  return String(text)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+var app = {
+  user: null,
+  teams: [],
+  maxFavorites: 5,
+  maxLength: 300,
+  room: "general",
+  lastId: 0,
+  busy: false,
+  forceScroll: false,
+  timer: null
+};
+
+// Talks to the helper server. Never throws: always returns { ok, status, data }.
+async function api(path, body) {
+  var options = {};
+  if (body !== undefined) {
+    options = {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    };
+  }
+
+  try {
+    var response = await fetch(path, options);
+    var data = {};
+    try { data = await response.json(); } catch (e) { data = {}; }
+    return { ok: response.ok, status: response.status, data: data };
+  } catch (error) {
+    return { ok: false, status: 0, data: { error: "Could not reach the server. Is it running?" } };
+  }
+}
+
+function teamName(id) {
+  var team = app.teams.find(function (t) { return t.id === id; });
+  return team ? team.name : id;
+}
+
+function roomTitle(room) {
+  return room === "general" ? "Fan Lounge" : teamName(room) + " fans";
+}
+
+
+/* ---------- 2. THEME ---------- */
+var THEME_KEY = "hs-theme";
+var THEME_ICONS = { auto: "\u25D0", light: "\u2600", dark: "\u263E" };
+var THEME_LABELS = { auto: "Theme: automatic", light: "Theme: light", dark: "Theme: dark" };
+
+function getThemeMode() {
+  try { return localStorage.getItem(THEME_KEY) || "auto"; } catch (e) { return "auto"; }
+}
+
+function applyTheme(mode) {
+  var prefersDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+  var resolved = mode === "auto" ? (prefersDark ? "dark" : "light") : mode;
+  document.documentElement.setAttribute("data-theme", resolved);
+
+  var button = $("theme-btn");
+  button.textContent = THEME_ICONS[mode];
+  button.setAttribute("aria-label", THEME_LABELS[mode]);
+  button.title = THEME_LABELS[mode];
+
+  var meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.setAttribute("content", resolved === "dark" ? "#000000" : "#121212");
+}
+
+function cycleTheme() {
+  var order = ["auto", "light", "dark"];
+  var next = order[(order.indexOf(getThemeMode()) + 1) % order.length];
+  try { localStorage.setItem(THEME_KEY, next); } catch (e) {}
+  applyTheme(next);
+}
+
+
+/* ---------- 3. SIGN-IN ---------- */
+function showView(name) {
+  $("server-problem").hidden = name !== "problem";
+  $("auth-view").hidden = name !== "auth";
+  $("recovery-view").hidden = name !== "recovery";
+  $("chat-view").hidden = name !== "chat";
+}
+
+function setAuthMode(mode) {
+  document.querySelectorAll(".auth-tab").forEach(function (b) {
+    b.classList.toggle("active", b.dataset.mode === mode);
+  });
+  $("login-form").hidden = mode !== "login";
+  $("signup-form").hidden = mode !== "signup";
+  $("recover-form").hidden = mode !== "recover";
+  $("auth-error").textContent = "";
+}
+
+async function submitLogin(event) {
+  event.preventDefault();
+  $("auth-error").textContent = "";
+
+  var result = await api("/fan/login", {
+    username: $("login-username").value,
+    password: $("login-password").value
+  });
+
+  if (!result.ok) {
+    $("auth-error").textContent = result.data.error || "Could not log in.";
+    return;
+  }
+  $("login-password").value = "";
+  if (result.data.recoveryCode) { showRecovery(result.data.user, result.data.recoveryCode); return; }
+  enterChat(result.data.user);
+}
+
+async function submitSignup(event) {
+  event.preventDefault();
+  $("auth-error").textContent = "";
+
+  var result = await api("/fan/signup", {
+    username: $("signup-username").value,
+    password: $("signup-password").value,
+    ageOk: $("signup-age").checked
+  });
+
+  if (!result.ok) {
+    $("auth-error").textContent = result.data.error || "Could not create the account.";
+    return;
+  }
+  $("signup-password").value = "";
+  showRecovery(result.data.user, result.data.recoveryCode);
+}
+
+// Shows the one-time recovery code before the person goes into the chat
+function showRecovery(user, code) {
+  app.pendingUser = user;
+  $("recovery-code").textContent = code;
+  showView("recovery");
+}
+
+async function submitRecover(event) {
+  event.preventDefault();
+  $("auth-error").textContent = "";
+
+  var result = await api("/fan/recover", {
+    username: $("recover-username").value,
+    recoveryCode: $("recover-code").value,
+    newPassword: $("recover-password").value
+  });
+
+  if (!result.ok) {
+    $("auth-error").textContent = result.data.error || "Could not reset the password.";
+    return;
+  }
+  $("recover-password").value = "";
+  $("recover-code").value = "";
+  showRecovery(result.data.user, result.data.recoveryCode);
+}
+
+function finishRecovery() {
+  $("recovery-code").textContent = "";
+  var user = app.pendingUser;
+  app.pendingUser = null;
+  enterChat(user);
+  if (!user.favorites || user.favorites.length === 0) $("fav-details").open = true;   // invite new users to pick teams
+}
+
+function copyRecovery() {
+  var code = $("recovery-code").textContent;
+  var note = function (text) { $("recovery-copy").textContent = text; };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(code).then(function () { note("Copied!"); }, function () { note("Copy it by hand"); });
+  } else {
+    note("Copy it by hand");
+  }
+}
+
+/* ---------- 3b. BLOCKED USERS ---------- */
+function renderBlocked() {
+  var list = app.user.blocked || [];
+  $("block-list").innerHTML = list.length === 0
+    ? "<li>You haven't blocked anyone.</li>"
+    : list.map(function (name) {
+        return "<li><span>" + esc(name) + '</span><button class="mini-btn" data-unblock="' + esc(name) + '">Unblock</button></li>';
+      }).join("");
+}
+
+// Reloads the room so a newly (un)blocked person's messages appear or disappear
+function reloadRoom() {
+  app.lastId = 0;
+  $("messages").innerHTML = "";
+  poll(true);
+}
+
+async function setBlocked(username, shouldBlock) {
+  var result = await api(shouldBlock ? "/fan/block" : "/fan/unblock", { username: username });
+  if (!result.ok) {
+    $("composer-note").textContent = result.data.error || "Could not update your block list.";
+    return;
+  }
+  app.user = result.data.user;
+  renderBlocked();
+  reloadRoom();
+}
+
+function leaveChat(message) {
+  clearInterval(app.timer);
+  app.timer = null;
+  app.user = null;
+  showView("auth");
+  setAuthMode("login");
+  $("auth-error").textContent = message || "";
+}
+
+async function doLogout() {
+  await api("/fan/logout", {});
+  leaveChat("");
+}
+
+
+/* ---------- 4. FAVORITES ---------- */
+function buildFavorites() {
+  $("fav-help").textContent = "Pick up to " + app.maxFavorites +
+    ". Your first pick shows next to your name in chat.";
+
+  var html = "";
+  ["SWAC", "MEAC"].forEach(function (conf) {
+    html += '<div class="fav-group"><h4>' + conf + "</h4>";
+    app.teams.filter(function (t) { return t.conf === conf; }).forEach(function (t) {
+      var checked = app.user.favorites.indexOf(t.id) !== -1 ? "checked" : "";
+      html += '<label class="fav-item"><input type="checkbox" value="' + esc(t.id) + '" ' + checked + "> " +
+        esc(t.name) + "</label>";
+    });
+    html += "</div>";
+  });
+  $("fav-list").innerHTML = html;
+  updateFavSummary();
+}
+
+function updateFavSummary() {
+  var favs = app.user.favorites;
+  $("fav-summary").textContent = favs.length === 0
+    ? "No favorite teams yet. Open the list above to pick some."
+    : "Your teams: " + favs.map(teamName).join(", ");
+}
+
+function checkedFavorites() {
+  var ids = [];
+  document.querySelectorAll("#fav-list input:checked").forEach(function (box) { ids.push(box.value); });
+  return ids;
+}
+
+async function saveFavorites() {
+  $("fav-note").textContent = "Saving...";
+
+  // Keep the user's existing order, then add new picks
+  var chosen = checkedFavorites();
+  var ordered = app.user.favorites.filter(function (id) { return chosen.indexOf(id) !== -1; });
+  chosen.forEach(function (id) { if (ordered.indexOf(id) === -1) ordered.push(id); });
+
+  var result = await api("/fan/favorites", { teams: ordered });
+
+  if (!result.ok) {
+    $("fav-note").textContent = result.data.error || "Could not save.";
+    return;
+  }
+
+  app.user = result.data.user;
+  $("fav-note").textContent = "Saved!";
+  setTimeout(function () { $("fav-note").textContent = ""; }, 2000);
+  updateFavSummary();
+  buildRooms();
+}
+
+
+/* ---------- 5. ROOMS ---------- */
+function buildRooms() {
+  // Sidebar (computers)
+  var html = '<button class="room-btn" data-room="general">Fan Lounge (everyone)</button>';
+  app.user.favorites.forEach(function (id) {
+    html += '<button class="room-btn" data-room="' + esc(id) + '">\u2B50 ' + esc(teamName(id)) + "</button>";
+  });
+  $("rooms").innerHTML = html;
+
+  var options = '<option value="">Visit another team\'s room...</option>';
+  app.teams.forEach(function (t) {
+    options += '<option value="' + esc(t.id) + '">' + esc(t.name) + " (" + t.conf + ")</option>";
+  });
+  $("other-room").innerHTML = options;
+
+  // Room dropdown (phones)
+  var picker = '<optgroup label="Everyone"><option value="general">Fan Lounge</option></optgroup>';
+  if (app.user.favorites.length > 0) {
+    picker += '<optgroup label="My teams">' + app.user.favorites.map(function (id) {
+      return '<option value="' + esc(id) + '">\u2B50 ' + esc(teamName(id)) + "</option>";
+    }).join("") + "</optgroup>";
+  }
+  ["SWAC", "MEAC"].forEach(function (conf) {
+    picker += '<optgroup label="' + conf + ' teams">' +
+      app.teams.filter(function (t) { return t.conf === conf; }).map(function (t) {
+        return '<option value="' + esc(t.id) + '">' + esc(t.name) + "</option>";
+      }).join("") + "</optgroup>";
+  });
+  $("room-select").innerHTML = picker;
+  $("room-select").value = app.room;
+
+  highlightRoom();
+}
+
+function highlightRoom() {
+  document.querySelectorAll(".room-btn").forEach(function (b) {
+    b.classList.toggle("active", b.dataset.room === app.room);
+  });
+}
+
+function changeRoom(room) {
+  app.room = room;
+  app.lastId = 0;
+  $("messages").innerHTML = "";
+  $("new-pill").hidden = true;
+  $("room-title").textContent = roomTitle(room);
+  $("room-sub").textContent = room === "general" ? "Open to all fans" : "Team room";
+  $("composer-note").textContent = "";
+  $("room-select").value = room;
+  highlightRoom();
+  poll(true);
+}
+
+
+/* ---------- 6. CHAT ---------- */
+function formatTime(iso) {
+  var d = new Date(iso);
+  if (isNaN(d.getTime())) return "";
+  var time = d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  if (d.toDateString() === new Date().toDateString()) return time;
+  return d.toLocaleDateString([], { month: "short", day: "numeric" }) + " " + time;
+}
+
+function messageHtml(m) {
+  return '<div class="msg-top"><strong>' + esc(m.username) + "</strong>" +
+    (m.favTeam ? '<span class="fan-tag">' + esc(m.favTeam) + " fan</span>" : "") +
+    '<span class="msg-time">' + esc(formatTime(m.time)) + "</span></div>" +
+    '<div class="msg-text">' + esc(m.text) + "</div>" +
+    '<div class="msg-actions">' +
+    (m.mine ? '<button data-act="delete">Delete</button>'
+            : '<button data-act="report">Report</button> <button data-act="block" data-user="' + esc(m.username) + '">Block</button>') +
+    "</div>";
+}
+
+function updateEmptyNote() {
+  var list = $("messages");
+  var hasMessages = list.querySelector(".msg") !== null;
+  var note = $("empty-note");
+
+  if (!hasMessages && !note) {
+    var p = document.createElement("p");
+    p.id = "empty-note";
+    p.className = "empty-note";
+    p.textContent = "No messages yet. Say hello!";
+    list.appendChild(p);
+  } else if (hasMessages && note) {
+    note.remove();
+  }
+}
+
+function isNearBottom() {
+  var list = $("messages");
+  return list.scrollHeight - list.scrollTop - list.clientHeight < 80;
+}
+
+function scrollToBottom() {
+  var list = $("messages");
+  list.scrollTop = list.scrollHeight;
+  $("new-pill").hidden = true;
+}
+
+// Asks the server for new messages
+async function poll(initial) {
+  if (!app.user || app.busy) return;
+  app.busy = true;
+
+  var room = app.room;
+  var result = await api("/fan/messages?room=" + encodeURIComponent(room) + "&after=" + app.lastId);
+  app.busy = false;
+
+  if (room !== app.room) return;       // the visitor switched rooms meanwhile
+
+  if (!result.ok) {
+    if (result.status === 401) {
+      leaveChat("Your session expired. Please log in again.");
+    } else {
+      $("composer-note").textContent = result.data.error || "Could not load messages.";
+    }
+    return;
+  }
+
+  var list = $("messages");
+  var stick = isNearBottom() || initial || app.forceScroll;
+  app.forceScroll = false;
+  var added = 0;
+
+  result.data.messages.forEach(function (m) {
+    if (list.querySelector('.msg[data-id="' + m.id + '"]')) return;
+    var div = document.createElement("div");
+    div.className = "msg" + (m.mine ? " mine" : "");
+    div.dataset.id = m.id;
+    div.innerHTML = messageHtml(m);
+    list.appendChild(div);
+    added++;
+    if (m.id > app.lastId) app.lastId = m.id;
+  });
+
+  // Remove messages that were deleted or hidden
+  var visible = result.data.visibleIds;
+  list.querySelectorAll(".msg").forEach(function (node) {
+    if (visible.indexOf(Number(node.dataset.id)) === -1) node.remove();
+  });
+
+  updateEmptyNote();
+
+  if (stick) scrollToBottom();
+  else if (added > 0) $("new-pill").hidden = false;
+}
+
+async function sendMessage(event) {
+  event.preventDefault();
+  var input = $("message-input");
+  var text = input.value.trim();
+  if (!text) return;
+
+  $("send-btn").disabled = true;
+  $("composer-note").textContent = "";
+
+  var result = await api("/fan/messages", { room: app.room, text: text });
+  $("send-btn").disabled = false;
+
+  if (!result.ok) {
+    if (result.status === 401) leaveChat("Your session expired. Please log in again.");
+    else $("composer-note").textContent = result.data.error || "Could not send.";
+    return;
+  }
+
+  input.value = "";
+  $("char-count").textContent = "0 / " + app.maxLength;
+  input.focus();
+  app.forceScroll = true;
+  poll(false);
+}
+
+async function messageAction(event) {
+  var button = event.target.closest("button[data-act]");
+  if (!button) return;
+  var node = button.closest(".msg");
+  var id = Number(node.dataset.id);
+
+  if (button.dataset.act === "block") {
+    var who = button.dataset.user;
+    if (window.confirm("Block " + who + "? You won't see their messages.")) setBlocked(who, true);
+    return;
+  }
+
+  if (button.dataset.act === "delete") {
+    var del = await api("/fan/delete", { id: id });
+    if (del.ok) { node.remove(); updateEmptyNote(); }
+    else $("composer-note").textContent = del.data.error || "Could not delete.";
+  } else {
+    var rep = await api("/fan/report", { id: id });
+    if (rep.ok) { button.textContent = "Reported"; button.disabled = true; }
+    else $("composer-note").textContent = rep.data.error || "Could not report.";
+  }
+}
+
+function enterChat(user) {
+  app.user = user;
+  $("who").textContent = user.username;
+  $("admin-link").hidden = !user.admin;
+  showView("chat");
+  renderBlocked();
+  buildFavorites();
+  app.room = "general";
+  buildRooms();
+  changeRoom("general");
+
+  clearInterval(app.timer);
+  app.timer = setInterval(function () {
+    if (!document.hidden) poll(false);
+  }, 3000);
+}
+
+
+/* ---------- 7. START ---------- */
+function bindEvents() {
+  $("theme-btn").addEventListener("click", cycleTheme);
+
+  document.querySelectorAll(".auth-tab").forEach(function (b) {
+    b.addEventListener("click", function () { setAuthMode(b.dataset.mode); });
+  });
+  $("login-form").addEventListener("submit", submitLogin);
+  $("signup-form").addEventListener("submit", submitSignup);
+  $("recover-form").addEventListener("submit", submitRecover);
+  $("recovery-copy").addEventListener("click", copyRecovery);
+  $("recovery-done").addEventListener("click", finishRecovery);
+  $("block-list").addEventListener("click", function (event) {
+    var button = event.target.closest("button[data-unblock]");
+    if (button) setBlocked(button.dataset.unblock, false);
+  });
+  $("logout").addEventListener("click", doLogout);
+
+  $("fav-save").addEventListener("click", saveFavorites);
+  $("fav-list").addEventListener("change", function (event) {
+    if (checkedFavorites().length > app.maxFavorites) {
+      event.target.checked = false;
+      $("fav-note").textContent = "You can pick up to " + app.maxFavorites + " teams.";
+    }
+  });
+
+  $("rooms").addEventListener("click", function (event) {
+    var button = event.target.closest(".room-btn");
+    if (button) changeRoom(button.dataset.room);
+  });
+  $("other-room").addEventListener("change", function () {
+    var room = $("other-room").value;
+    $("other-room").value = "";
+    if (room) changeRoom(room);
+  });
+  $("room-select").addEventListener("change", function () {
+    if ($("room-select").value) changeRoom($("room-select").value);
+  });
+
+  $("composer").addEventListener("submit", sendMessage);
+  $("message-input").addEventListener("input", function () {
+    $("char-count").textContent = $("message-input").value.length + " / " + app.maxLength;
+  });
+  $("messages").addEventListener("click", messageAction);
+
+  // "New messages" button
+  $("new-pill").addEventListener("click", scrollToBottom);
+  $("messages").addEventListener("scroll", function () {
+    if (isNearBottom()) $("new-pill").hidden = true;
+  }, { passive: true });
+
+  // Hide the bottom bar while the keyboard is open on a phone
+  document.addEventListener("focusin", function (event) {
+    var t = event.target;
+    if (t.tagName === "INPUT" && t.type !== "checkbox") document.body.classList.add("kb-open");
+  });
+  document.addEventListener("focusout", function () {
+    document.body.classList.remove("kb-open");
+  });
+
+  document.addEventListener("visibilitychange", function () {
+    if (!document.hidden) poll(false);
+  });
+
+  // Follow the phone's own light/dark setting while the theme is on Auto
+  if (window.matchMedia) {
+    var query = window.matchMedia("(prefers-color-scheme: dark)");
+    var onChange = function () { if (getThemeMode() === "auto") applyTheme("auto"); };
+    if (query.addEventListener) query.addEventListener("change", onChange);
+    else if (query.addListener) query.addListener(onChange);
+  }
+}
+
+async function init() {
+  applyTheme(getThemeMode());
+  bindEvents();
+
+  var teams = await api("/fan/teams");
+  if (!teams.ok || !teams.data.teams) {
+    showView("problem");
+    return;
+  }
+
+  app.teams = teams.data.teams;
+  app.maxFavorites = teams.data.maxFavorites;
+  app.maxLength = teams.data.maxLength;
+
+  var config = await api("/fan/config");
+  if (config.ok && config.data.contact) {
+    $("contact-line").textContent = "Contact: " + config.data.contact;
+  }
+
+  var me = await api("/fan/me");
+  if (me.ok && me.data.user) enterChat(me.data.user);
+  else showView("auth");
+}
+
+init();
+</script>
+
+<script>
+// Turns off the right-click menu, except inside text boxes so people can still paste
+document.addEventListener("contextmenu", function (event) {
+  var tag = event.target && event.target.tagName;
+  if (tag === "INPUT" || tag === "TEXTAREA") return;
+  event.preventDefault();
+});
+</script>
+
+</body>
+</html>
