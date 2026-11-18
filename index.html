@@ -682,7 +682,8 @@ var PROXY_URL = "https://hbcu-surge-data.elliotross04.workers.dev";
 // Which route the data takes:
 //   1. http://localhost:3000 (node server.js)  -> your helper server
 //   2. PROXY_URL filled in                      -> your online data helper
-var USE_SERVER = location.port === "3000";
+var USE_SERVER = location.port === "3000" ||
+  (/^https?:$/.test(location.protocol) && !/(github\.io|pages\.dev)$/.test(location.hostname));
 var SITE_BASE = "/api/site/";
 var ATHLETE_BASE = "/api/athlete/";
 
