@@ -496,8 +496,8 @@ th { background: var(--thead); color: #fff; font-size: 0.8rem; text-transform: u
   <div class="header-right">
     <nav class="sport-tabs" aria-label="Choose a sport">
       <button class="tab active" data-sport="football">Football</button>
-      <button class="tab" data-sport="basketball">Basketball</button>
-    </nav>
+      <button class="tab" data-sport="basketball">MBB</button>
+      <button class="tab" data-sport="wbb">WBB</button>    </nav>
     <button id="theme-btn" class="theme-btn" aria-label="Change theme" title="Change theme">&#9680;</button>
   </div>
 </header>
@@ -698,6 +698,7 @@ var CONFIG = {
   apiBase: SITE_BASE,
   athleteApi: ATHLETE_BASE,
   basketballLeague: "basketball/mens-college-basketball",
+    wbbLeague: "basketball/womens-college-basketball",
   footballLeague: "football/college-football",
   basketballGroup: "50",   // all Division I
   footballGroup: "81",     // FCS
@@ -824,8 +825,9 @@ function dayHeading(key) {
 }
 
 function leagueOf(sport) {
-  return sport === "football" ? CONFIG.footballLeague : CONFIG.basketballLeague;
-}
+  if (sport === "football") return CONFIG.footballLeague;
+  if (sport === "wbb") return CONFIG.wbbLeague;
+  return CONFIG.basketballLeague;}
 
 function groupOf(sport) {
   return sport === "football" ? CONFIG.footballGroup : CONFIG.basketballGroup;
@@ -881,8 +883,7 @@ function scoreText(score) {
 
 // Label for a quarter/half column: 1, 2, 3, 4, OT, 2OT...
 function periodLabel(sport, i) {
-  var regular = sport === "football" ? 4 : 2;
-  if (i < regular) return String(i + 1);
+  var regular = (sport === "football" || sport === "wbb") ? 4 : 2;  if (i < regular) return String(i + 1);
   var ot = i - regular + 1;
   return ot === 1 ? "OT" : ot + "OT";
 }
@@ -2410,7 +2411,7 @@ function renderStandings() {
     "Conference record counts games between teams in the same conference. " +
     "For official standings and tiebreakers, check swac.org and meacsports.com.";
   if (useDivisions) note += " SWAC teams are ranked within their division by conference record, then overall record.";
-  if (state.sport === "basketball") note += " Conference tournament games are included in the conference record.";
+   if (state.sport === "basketball" || state.sport === "wbb") note += " Conference tournament games are included in the conference record.";
   $("standings-note").textContent = note;
 }
 
