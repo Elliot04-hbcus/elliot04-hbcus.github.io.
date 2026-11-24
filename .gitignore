@@ -1,0 +1,6 @@
+# Private data: never upload these to GitHub
+fan-data.json
+recruit-data.json
+*.tmp
+node_modules
+.env
