@@ -1,0 +1,1021 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#121212">
+<meta name="color-scheme" content="light dark">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="HBCU Surge">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<title>Recruiting | HBCU Surge</title>
+<meta name="robots" content="noindex">
+
+<script>
+/* Sets light or dark before the page paints, so there is no flash */
+(function () {
+  var mode = "auto";
+  try { mode = localStorage.getItem("hs-theme") || "auto"; } catch (e) {}
+  var dark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+  var resolved = mode === "auto" ? (dark ? "dark" : "light") : mode;
+  document.documentElement.setAttribute("data-theme", resolved);
+})();
+</script>
+
+<style>
+:root {
+  color-scheme: light;
+  --bg: #f2f2f2;
+  --card: #ffffff;
+  --card2: #f5f5f5;
+  --text: #111111;
+  --muted: #666666;
+  --line: #e6e6e6;
+  --thead: #121212;
+  --header: #121212;
+  --accent: #cc0000;
+  --field: #bbbbbb;
+  --hover: #ececec;
+  --active-bg: #fff4f4;
+  --error: #b00020;
+  --shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+  --bottom-h: 60px;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0e0e10;
+  --card: #1a1a1d;
+  --card2: #252529;
+  --text: #ececec;
+  --muted: #a3a3ab;
+  --line: #2c2c31;
+  --thead: #2a2a2f;
+  --header: #000000;
+  --accent: #e53935;
+  --field: #4a4a50;
+  --hover: #2a2a2f;
+  --active-bg: #2b1a1c;
+  --error: #ff7a8a;
+  --shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+[hidden] { display: none !important; }
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+
+button, input, select { font-family: inherit; font-size: 1rem; color: inherit; }
+button { cursor: pointer; touch-action: manipulation; }
+button, a { -webkit-tap-highlight-color: transparent; }
+
+/* ----- Header ----- */
+.site-header {
+  background: var(--header); color: #fff; padding: 1rem 2rem;
+  display: flex; justify-content: space-between; align-items: center;
+  flex-wrap: wrap; gap: 1rem;
+}
+.brand { font-size: 1.5rem; text-transform: uppercase; }
+.brand a { color: inherit; text-decoration: none; }
+.brand span { color: var(--accent); }
+.header-right { display: flex; align-items: center; gap: 0.6rem; }
+.view-tabs { display: flex; gap: 0.4rem; }
+.pill {
+  background: #2a2a2a; color: #ddd; border-radius: 999px; padding: 0.4rem 1rem;
+  font-size: 0.8rem; font-weight: 700; text-transform: uppercase; text-decoration: none; border: none;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.pill.active { background: var(--accent); color: #fff; }
+.theme-btn {
+  background: #2a2a2a; color: #fff; border: none; border-radius: 50%;
+  width: 36px; height: 36px; font-size: 1.1rem; line-height: 1;
+}
+
+.page { padding: 1.5rem 2rem 2rem; }
+h2 { margin-bottom: 0.8rem; font-size: 1.1rem; text-transform: uppercase; }
+h3 { margin-bottom: 0.6rem; font-size: 0.95rem; text-transform: uppercase; }
+.muted { color: var(--muted); font-size: 0.85rem; }
+
+.card { background: var(--card); border-radius: 8px; padding: 1.2rem; box-shadow: var(--shadow); }
+
+.notice {
+  background: var(--card); border-left: 6px solid var(--accent); border-radius: 8px;
+  padding: 1.2rem; max-width: 640px; margin: 0 auto;
+}
+.notice code { background: var(--card2); padding: 1px 6px; border-radius: 4px; }
+
+/* ----- Sign-in ----- */
+.auth-card { max-width: 440px; margin: 0 auto; }
+.auth-tabs { display: flex; gap: 0.3rem; margin-bottom: 1rem; border-bottom: 2px solid var(--line); }
+.auth-tab {
+  background: none; border: none; border-bottom: 3px solid transparent; margin-bottom: -2px;
+  padding: 0.6rem 1.1rem; color: var(--muted); font-weight: 700; text-transform: uppercase; font-size: 0.9rem;
+  min-height: 44px;
+}
+.auth-tab.active { color: var(--text); border-bottom-color: var(--accent); }
+
+label.field { display: block; margin-bottom: 0.9rem; font-size: 0.85rem; font-weight: 700; }
+label.field input {
+  display: block; width: 100%; margin-top: 0.3rem; padding: 0.7rem; min-height: 44px;
+  border: 1px solid var(--field); border-radius: 6px; font-weight: 400; font-size: 16px;
+  background: var(--card); color: var(--text);
+}
+.check { display: flex; gap: 0.6rem; align-items: flex-start; margin-bottom: 1rem; font-size: 0.82rem; }
+.check input { margin-top: 0.2rem; width: 20px; height: 20px; flex: 0 0 auto; }
+
+.btn {
+  background: var(--accent); color: #fff; border: none; border-radius: 6px;
+  padding: 0.6rem 1.1rem; font-weight: 700; text-transform: uppercase; font-size: 0.85rem; min-height: 44px;
+}
+.btn:disabled { opacity: 0.5; cursor: default; }
+.btn-dark { background: var(--thead); }
+.btn-plain { background: var(--card); color: var(--text); border: 1px solid var(--field); }
+.btn-wide { width: 100%; }
+
+.error { color: var(--error); font-size: 0.85rem; margin-top: 0.8rem; min-height: 1.1rem; }
+
+/* ----- Chat layout ----- */
+.chat-layout { display: grid; grid-template-columns: 300px 1fr; gap: 1.5rem; align-items: start; }
+.side-stack { display: grid; gap: 1rem; }
+
+.who { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; }
+.who strong { font-size: 1.1rem; word-break: break-all; }
+
+.fav-details summary { cursor: pointer; font-weight: 700; font-size: 0.85rem; text-transform: uppercase; min-height: 28px; }
+.fav-group { margin-top: 0.8rem; }
+.fav-group h4 { color: var(--accent); font-size: 0.75rem; margin-bottom: 0.3rem; letter-spacing: 0.04em; }
+.fav-item { display: flex; gap: 0.6rem; align-items: center; padding: 0.3rem 0; font-size: 0.95rem; }
+.fav-item input { width: 20px; height: 20px; }
+.fav-actions { margin-top: 0.9rem; display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap; }
+
+.room-btn {
+  display: block; width: 100%; text-align: left; background: var(--card2); color: var(--text); border: none;
+  border-left: 4px solid transparent; border-radius: 6px; padding: 0.7rem;
+  margin-bottom: 0.4rem; font-weight: 700; font-size: 0.9rem;
+}
+.room-btn:hover { background: var(--hover); }
+.room-btn.active { background: var(--active-bg); border-left-color: var(--accent); }
+.room-select {
+  width: 100%; margin-top: 0.4rem; padding: 0.6rem; min-height: 44px;
+  border: 1px solid var(--field); border-radius: 6px; font-size: 0.9rem;
+  background: var(--card); color: var(--text);
+}
+.room-picker { display: none; margin-bottom: 0.6rem; }
+
+/* ----- Chat panel ----- */
+.chat-head { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; flex-wrap: wrap; margin-bottom: 0.6rem; }
+.chat-head h2 { margin-bottom: 0; }
+
+.messages-wrap { position: relative; }
+.messages {
+  height: 55vh; min-height: 320px; overflow-y: auto; background: var(--bg);
+  border: 1px solid var(--line); border-radius: 8px; padding: 0.8rem;
+  -webkit-overflow-scrolling: touch; overscroll-behavior: contain;
+}
+.new-pill {
+  position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%);
+  background: var(--accent); color: #fff; border: none; border-radius: 999px;
+  padding: 0.5rem 1rem; font-size: 0.8rem; font-weight: 700; box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+}
+.empty-note { color: var(--muted); text-align: center; padding: 2rem 1rem; font-size: 0.9rem; }
+
+.msg {
+  background: var(--card); border-radius: 8px; padding: 0.55rem 0.8rem; margin-bottom: 0.5rem;
+  box-shadow: var(--shadow); border-left: 4px solid var(--line);
+}
+.msg.mine { border-left-color: var(--accent); }
+.msg-top { display: flex; align-items: baseline; gap: 0.5rem; flex-wrap: wrap; }
+.fan-tag {
+  background: var(--thead); color: #fff; border-radius: 4px; padding: 1px 6px;
+  font-size: 0.65rem; font-weight: 700; text-transform: uppercase;
+}
+.msg-time { margin-left: auto; color: var(--muted); font-size: 0.72rem; }
+.msg-text { margin-top: 0.2rem; white-space: pre-wrap; word-break: break-word; }
+.msg-actions { margin-top: 0.1rem; }
+.msg-actions button {
+  background: none; border: none; color: var(--muted); font-size: 0.75rem;
+  text-decoration: underline; padding: 0.35rem 0.4rem 0.35rem 0;
+}
+.msg-actions button:disabled { text-decoration: none; cursor: default; }
+
+.composer { display: flex; gap: 0.6rem; margin-top: 0.8rem; }
+.composer input {
+  flex: 1; padding: 0.65rem 0.8rem; min-height: 44px; border: 1px solid var(--field);
+  border-radius: 6px; min-width: 0; font-size: 16px; background: var(--card); color: var(--text);
+}
+.composer-info { display: flex; justify-content: space-between; gap: 1rem; margin-top: 0.4rem; font-size: 0.78rem; color: var(--muted); }
+.composer-note { color: var(--error); }
+.rules { margin-top: 1rem; font-size: 0.78rem; color: var(--muted); }
+
+.site-footer { padding: 1rem 2rem 2rem; color: var(--muted); font-size: 0.75rem; text-align: center; }
+
+/* ----- Bottom nav (phones) ----- */
+.bottom-nav {
+  display: none; position: fixed; left: 0; right: 0; bottom: 0; z-index: 30;
+  background: var(--header); border-top: 1px solid #2a2a2a;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.bottom-nav a {
+  flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  min-height: var(--bottom-h); color: #aaaaaa; font-size: 0.68rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.03em; text-decoration: none;
+}
+.bottom-nav a.active { color: #ff6b63; }
+.bottom-nav svg {
+  width: 24px; height: 24px; fill: none; stroke: currentColor;
+  stroke-width: 2; stroke-linejoin: round; stroke-linecap: round;
+}
+
+/* ----- ADDED: recovery code, blocking, admin link ----- */
+.recovery { border: 2px dashed var(--accent); border-radius: 8px; padding: 1rem; margin: 0.8rem 0; background: var(--card2); }
+.recovery code { display: block; font-size: 1.25rem; letter-spacing: 0.06em; margin: 0.5rem 0; word-break: break-all; font-weight: 800; }
+.btn-row { display: flex; gap: 0.6rem; flex-wrap: wrap; }
+.block-list { list-style: none; margin-top: 0.6rem; }
+.block-list li { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; padding: 0.2rem 0; font-size: 0.9rem; }
+.mini-btn { background: none; border: none; color: var(--accent); text-decoration: underline; font-size: 0.8rem; min-height: 36px; }
+.auth-link { color: var(--accent); }
+.site-footer a, .rules a { color: var(--muted); }
+:focus-visible { outline: 3px solid #2f7df6; outline-offset: 2px; }
+
+/* ----- Phones ----- */
+@media (max-width: 700px) {
+  body { padding-bottom: calc(var(--bottom-h) + env(safe-area-inset-bottom)); }
+  body.kb-open { padding-bottom: 0; }
+  body.kb-open .bottom-nav { display: none; }
+
+  .site-header { padding: 0.7rem 1rem; flex-wrap: nowrap; }
+  .brand { font-size: 1.25rem; }
+  .view-tabs { display: none; }
+  .theme-btn { width: 44px; height: 44px; }
+  .bottom-nav { display: flex; }
+
+  .page { padding: 0.8rem; }
+  .chat-layout { display: flex; flex-direction: column; gap: 0.7rem; }
+  .side-stack { gap: 0.7rem; }
+  .side-stack .card { padding: 0.8rem; }
+  .rooms-card { display: none; }
+  .room-picker { display: block; }
+  .room-picker .room-select { margin-top: 0; }
+
+  .chat-card {
+    display: flex; flex-direction: column; padding: 0.8rem;
+    height: max(440px, calc(100vh - 330px));
+    height: max(440px, calc(100dvh - 330px));
+  }
+  .chat-head { margin-bottom: 0.4rem; }
+  .chat-head h2 { font-size: 1rem; }
+  .messages-wrap { flex: 1; min-height: 0; }
+  .messages { height: 100%; min-height: 0; }
+  .rules { display: none; }
+  .site-footer { display: none; }
+  .auth-card { padding: 1rem; }
+}
+/* ----- recruiting ----- */
+.rc { max-width: 1060px; margin: 0 auto; display: grid; gap: 1rem; }
+.rc-narrow { max-width: 640px; margin: 0 auto; }
+.rc h1 { font-size: 1.4rem; margin-bottom: 0.4rem; text-transform: none; }
+.rc p { line-height: 1.55; margin-bottom: 0.6rem; }
+.rc-top { display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap; }
+.rc-badge { display: inline-block; background: var(--card2); border: 1px solid var(--line); border-radius: 999px; padding: 0.1rem 0.6rem; font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; }
+.rc-badge.good { background: #1b7f3b; color: #fff; border-color: #1b7f3b; }
+.rc-badge.warn { background: #b26a00; color: #fff; border-color: #b26a00; }
+.rc-tabs { display: flex; gap: 0.3rem; flex-wrap: wrap; }
+.rc-tab { background: var(--card); border: 1px solid var(--line); border-radius: 999px; padding: 0.5rem 1rem; font-weight: 700; font-size: 0.82rem; text-transform: uppercase; min-height: 44px; color: var(--text); }
+.rc-tab.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+.rc-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 1rem; align-items: start; }
+.rc-form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0 0.8rem; }
+label.field select, label.field textarea {
+  display: block; width: 100%; margin-top: 0.3rem; padding: 0.7rem; min-height: 44px;
+  border: 1px solid var(--field); border-radius: 6px; font-weight: 400; font-size: 16px; background: var(--card); color: var(--text);
+}
+label.field textarea { min-height: 100px; resize: vertical; }
+label.field small { font-weight: 400; color: var(--muted); }
+.rc-section { border-top: 1px solid var(--line); padding-top: 0.9rem; margin-top: 0.9rem; }
+.rc-section > h3 { margin-bottom: 0.7rem; }
+.rc-row { display: grid; grid-template-columns: 1fr 2fr auto; gap: 0.5rem; align-items: end; margin-bottom: 0.4rem; }
+.rc-row label.field { margin-bottom: 0; }
+.rc-row .mini-btn { min-height: 44px; }
+.rc-two { display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem; }
+.rc-note { background: var(--card2); border-left: 4px solid var(--accent); padding: 0.7rem 0.9rem; border-radius: 4px; font-size: 0.85rem; margin-bottom: 1rem; }
+.rc-ok { color: #1b7f3b; font-size: 0.85rem; min-height: 1.1rem; margin-top: 0.6rem; }
+/* profile card (247-style) */
+.prof { overflow: hidden; padding: 0; }
+.prof-hero { display: flex; gap: 1rem; align-items: center; padding: 1.1rem; background: var(--thead); color: #fff; }
+.avatar { width: 64px; height: 64px; border-radius: 50%; background: var(--accent); color: #fff; display: grid; place-items: center; font-size: 1.5rem; font-weight: 800; flex: 0 0 auto; }
+.prof-hero h2 { margin: 0 0 0.2rem; font-size: 1.35rem; text-transform: none; color: #fff; word-break: break-word; }
+.prof-sub { color: #d0d0d6; font-size: 0.88rem; }
+.prof-badges { margin-top: 0.4rem; display: flex; gap: 0.4rem; flex-wrap: wrap; }
+.prof-body { padding: 1rem 1.1rem 1.2rem; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(92px, 1fr)); gap: 0.5rem; margin-bottom: 1rem; }
+.tile { background: var(--card2); border-radius: 6px; padding: 0.55rem 0.4rem; text-align: center; }
+.tile b { display: block; font-size: 1.1rem; font-variant-numeric: tabular-nums; }
+.tile span { font-size: 0.68rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.prof-body h3 { margin: 1rem 0 0.4rem; color: var(--accent); font-size: 0.8rem; letter-spacing: 0.06em; }
+.kv { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+.kv td { padding: 0.4rem 0.2rem; border-bottom: 1px solid var(--line); }
+.kv td:last-child { text-align: right; font-variant-numeric: tabular-nums; font-weight: 700; }
+.prof-foot { margin-top: 1rem; font-size: 0.75rem; color: var(--muted); }
+.prof-actions { display: flex; gap: 0.6rem; flex-wrap: wrap; margin: 0 0 1rem; }
+/* player list */
+.plist { display: grid; gap: 0.6rem; }
+.pitem { display: flex; justify-content: space-between; gap: 0.8rem; align-items: center; text-align: left; width: 100%; background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 0.8rem 1rem; color: var(--text); min-height: 64px; }
+.pitem:hover { background: var(--hover); }
+.pitem b { font-size: 1rem; }
+.pitem small { color: var(--muted); display: block; margin-top: 0.15rem; }
+.pitem .right { text-align: right; font-size: 0.8rem; color: var(--muted); white-space: nowrap; }
+.filters { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 0 0.7rem; }
+/* messages */
+.mail { display: grid; grid-template-columns: 280px minmax(0, 1fr); gap: 1rem; align-items: start; }
+.tlist { display: grid; gap: 0.4rem; }
+.titem { text-align: left; background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 0.7rem; color: var(--text); min-height: 56px; }
+.titem.active { border-color: var(--accent); background: var(--active-bg); }
+.titem b { display: flex; justify-content: space-between; gap: 0.4rem; }
+.titem small { display: block; color: var(--muted); margin-top: 0.15rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dot { background: var(--accent); color: #fff; border-radius: 999px; padding: 0 0.5rem; font-size: 0.72rem; }
+.convo { display: flex; flex-direction: column; gap: 0.5rem; max-height: 55vh; overflow-y: auto; padding: 0.3rem; background: var(--card2); border-radius: 8px; min-height: 160px; }
+.bub { max-width: 82%; padding: 0.5rem 0.75rem; border-radius: 12px; background: var(--card); box-shadow: var(--shadow); word-break: break-word; white-space: pre-wrap; }
+.bub.mine { align-self: flex-end; background: var(--accent); color: #fff; }
+.bub small { display: block; opacity: 0.7; font-size: 0.68rem; margin-top: 0.15rem; }
+.compose { display: flex; gap: 0.5rem; margin-top: 0.6rem; }
+.compose textarea { flex: 1; min-height: 48px; padding: 0.6rem; border: 1px solid var(--field); border-radius: 6px; font-size: 16px; background: var(--card); color: var(--text); resize: vertical; }
+@media (max-width: 760px) {
+  .rc-grid, .mail, .rc-two { grid-template-columns: 1fr; }
+  .rc-row { grid-template-columns: 1fr; }
+  .rc-tab { flex: 1 1 auto; text-align: center; padding: 0.5rem 0.6rem; }
+  .prof-hero { padding: 0.9rem; }
+  .bub { max-width: 92%; }
+}
+.prof-hero .rc-badge:not(.good):not(.warn) { background: rgba(255, 255, 255, 0.16); color: #fff; border-color: transparent; }
+</style>
+</head>
+
+<body>
+
+<header class="site-header">
+  <h1 class="brand"><a href="/">HBCU <span>Surge</span></a></h1>
+  <div class="header-right">
+    <nav class="view-tabs">
+      <a class="pill" href="/">Scores</a>
+      <a class="pill" href="/#teams">Teams</a>
+      <a class="pill" href="/#standings">Standings</a>      <a class="pill" href="/fan-talk">Fan Talk</a>
+      <a class="pill active" href="/recruiting">Recruiting</a>
+    </nav>
+    <button id="theme-btn" class="theme-btn" aria-label="Change theme" title="Change theme">&#9680;</button>
+  </div>
+</header>
+
+<main class="page">
+<div class="rc" id="rc">
+  <div class="card muted" id="loading">Loading&hellip;</div>
+
+  <!-- Not logged in -->
+  <section class="card rc-narrow" id="v-login" hidden>
+    <h1>Recruiting</h1>
+    <p>This area is only for <strong>verified players and college coaches</strong> from SWAC and MEAC schools. Every account is reviewed by hand before it can be used.</p>
+    <p>Log in with your Fan Talk account to start. If you don't have one yet, create it first and then come back to this page.</p>
+    <p><a class="btn" href="/fan-talk" style="display:inline-block;text-decoration:none;line-height:1.7">Log in or sign up on Fan Talk</a></p>
+  </section>
+
+  <!-- Choose a role / request access -->
+  <section class="rc-narrow" id="v-apply" hidden>
+    <div class="card">
+      <h1>Request access</h1>
+      <p>Recruiting is locked. Tell us who you are, and a person at HBCU Surge will review your request. You can use the recruiting tools only after it is approved. Reviews can take a few days.</p>
+      <div class="auth-tabs" role="tablist">
+        <button class="auth-tab active" id="role-player" type="button">I'm a player</button>
+        <button class="auth-tab" id="role-coach" type="button">I'm a coach</button>
+      </div>
+
+      <form id="form-player" novalidate>
+        <div class="rc-note">Your email address and phone number are never shown to coaches. Coaches contact you only through messages on this site, and only if you turn messaging on.</div>
+        <label class="field">Full name<input id="p-name" maxlength="60" autocomplete="name"></label>
+        <div class="rc-form-grid">
+          <label class="field">Date of birth<input id="p-dob" type="date" autocomplete="bday"></label>
+          <label class="field">Level<select id="p-level"><option value="highschool">High school</option><option value="transfer">Transfer / JUCO / college</option></select></label>
+          <label class="field">Sport<select id="p-sport"><option value="football">Football</option><option value="mbb">Men's basketball</option><option value="wbb">Women's basketball</option></select></label>
+          <label class="field">Class year<select id="p-year"></select></label>
+        </div>
+        <label class="field">Current school<input id="p-school" maxlength="80"></label>
+        <div class="rc-form-grid">
+          <label class="field">City<input id="p-city" maxlength="50"></label>
+          <label class="field">State (2 letters)<input id="p-state" maxlength="2" autocapitalize="characters"></label>
+        </div>
+        <div class="rc-section">
+          <h3>Someone who can confirm you play</h3>
+          <p class="muted">Your current coach or athletic director. Only the reviewers see this. It is used to check that you are a real player.</p>
+          <label class="field">Their name<input id="p-ref-name" maxlength="60"></label>
+          <label class="field">Their email or phone<input id="p-ref-contact" maxlength="120"></label>
+        </div>
+        <div class="rc-section" id="guardian-box" hidden>
+          <h3>Parent or guardian (required under 18)</h3>
+          <p class="muted">Players under 18 need a parent or guardian to agree. Only the reviewers see this, and we may contact them before approving.</p>
+          <label class="field">Parent or guardian name<input id="g-name" maxlength="60"></label>
+          <div class="rc-form-grid">
+            <label class="field">Relationship<input id="g-rel" maxlength="30" placeholder="Mother, father, guardian"></label>
+            <label class="field">Phone<input id="g-phone" maxlength="20" type="tel"></label>
+          </div>
+          <label class="field">Email<input id="g-email" maxlength="100" type="email"></label>
+          <label class="check"><input type="checkbox" id="g-consent"><span>I am this player's parent or legal guardian. I agree to my child using HBCU Surge Recruiting, and to verified coaches seeing their profile and messaging them here if messaging is turned on.</span></label>
+        </div>
+        <label class="check"><input type="checkbox" id="p-agree"><span>The information I entered is true. I understand coaches from verified SWAC and MEAC programs can see my profile once it is turned on, and I can turn it off or delete it at any time. I have read the <a class="auth-link" href="rules.html">rules</a> and <a class="auth-link" href="privacy.html">privacy page</a>.</span></label>
+        <button class="btn btn-wide" type="submit">Send request</button>
+        <p class="error" id="p-error" role="alert"></p>
+      </form>
+
+      <form id="form-coach" novalidate hidden>
+        <label class="field">Full name<input id="c-name" maxlength="60" autocomplete="name"></label>
+        <label class="field">School<select id="c-team"></select></label>
+        <label class="field">Job title<input id="c-title" maxlength="60" placeholder="Wide receivers coach"></label>
+        <fieldset style="border:none;margin-bottom:0.9rem"><legend style="font-size:0.85rem;font-weight:700;margin-bottom:0.3rem">Sports you recruit for</legend>
+          <label class="check" style="margin-bottom:0.3rem"><input type="checkbox" class="c-sport" value="football"><span>Football</span></label>
+          <label class="check" style="margin-bottom:0.3rem"><input type="checkbox" class="c-sport" value="mbb"><span>Men's basketball</span></label>
+          <label class="check" style="margin-bottom:0.3rem"><input type="checkbox" class="c-sport" value="wbb"><span>Women's basketball</span></label>
+        </fieldset>
+        <label class="field">Link to your school's staff page<small> (the page that lists you)</small><input id="c-staff" type="url" placeholder="https://..."></label>
+        <label class="field">Your school email<small> (ends in .edu, only reviewers see it)</small><input id="c-email" type="email" autocomplete="email"></label>
+        <label class="check"><input type="checkbox" id="c-agree"><span>I am a current staff member at the school I selected. I will follow NCAA, NAIA and school recruiting rules, including contact periods, will keep player information private, and will use messages here only for recruiting. I have read the <a class="auth-link" href="rules.html">rules</a> and <a class="auth-link" href="privacy.html">privacy page</a>.</span></label>
+        <button class="btn btn-wide" type="submit">Send request</button>
+        <p class="error" id="c-error" role="alert"></p>
+      </form>
+    </div>
+  </section>
+
+  <!-- Waiting / not approved -->
+  <section class="card rc-narrow" id="v-status" hidden>
+    <h1 id="st-title"></h1>
+    <p id="st-text"></p>
+    <p class="muted" id="st-note"></p>
+    <p id="st-actions"></p>
+  </section>
+
+  <!-- Approved -->
+  <section id="v-main" hidden>
+    <div class="card rc-top">
+      <div><strong id="m-name"></strong> <span class="rc-badge good">Approved</span> <span class="rc-badge" id="m-role"></span></div>
+      <nav class="rc-tabs" id="m-tabs" aria-label="Recruiting sections"></nav>
+    </div>
+    <div id="m-panel" style="margin-top:1rem"></div>
+  </section>
+</div>
+</main>
+
+<footer class="site-footer"><p><a href="rules.html">Community rules</a> &middot; <a href="privacy.html">Privacy</a></p></footer>
+
+<nav class="bottom-nav" aria-label="Main">
+  <a href="/">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 4v16"/></svg>
+    <span>Scores</span>
+  </a>
+  <a href="/#teams">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/></svg>
+    <span>Teams</span>
+  </a>
+  <a href="/#standings">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20V11M12 20V4M19 20v-6"/></svg>
+    <span>Standings</span>
+  </a>
+  <a href="/fan-talk">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"/></svg>
+    <span>Fan Talk</span>
+  </a>
+  <a class="active" href="/recruiting">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg>
+    <span>Recruit</span>
+  </a>
+</nav>
+
+<script>
+function $(id) { return document.getElementById(id); }
+function esc(text) {
+  return String(text == null ? "" : text).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+var THEME_ICONS = { auto: "◐", light: "☀", dark: "☾" };
+function themeMode() { try { return localStorage.getItem("hs-theme") || "auto"; } catch (e) { return "auto"; } }
+function applyTheme(mode) {
+  var dark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+  document.documentElement.setAttribute("data-theme", mode === "auto" ? (dark ? "dark" : "light") : mode);
+  $("theme-btn").textContent = THEME_ICONS[mode];
+}
+$("theme-btn").addEventListener("click", function () {
+  var order = ["auto", "light", "dark"], next = order[(order.indexOf(themeMode()) + 1) % 3];
+  try { localStorage.setItem("hs-theme", next); } catch (e) {}
+  applyTheme(next);
+});
+applyTheme(themeMode());
+
+async function api(path, body) {
+  var options = {};
+  if (body !== undefined) options = { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) };
+  try {
+    var response = await fetch(path, options);
+    var data = {};
+    try { data = await response.json(); } catch (e) { data = {}; }
+    return { ok: response.ok, status: response.status, data: data };
+  } catch (error) {
+    return { ok: false, status: 0, data: { error: "Could not reach the server." } };
+  }
+}
+
+var SPORT_NAMES = { football: "Football", mbb: "Men's basketball", wbb: "Women's basketball" };
+var POSITIONS = {
+  football: ["QB", "RB", "WR", "TE", "OL", "DL", "LB", "DB", "K", "P", "ATH"],
+  mbb: ["PG", "SG", "SF", "PF", "C", "G", "F"],
+  wbb: ["PG", "SG", "SF", "PF", "C", "G", "F"]
+};
+var MEAS_LABELS = { forty: "40-yard dash (sec)", vertical: "Vertical (in)", bench: "Bench (lbs)", squat: "Squat (lbs)", wingspan: "Wingspan (in)", sprint: "3/4 court sprint (sec)" };
+
+var S = { me: null, teams: [], tab: "", timer: null, convo: "", filters: { sport: "", year: "", pos: "", state: "", status: "", minGpa: "", q: "" } };
+
+function show(id) {
+  ["loading", "v-login", "v-apply", "v-status", "v-main"].forEach(function (x) { $(x).hidden = x !== id; });
+  window.scrollTo(0, 0);
+}
+function fmtHeight(n) { return n ? Math.floor(n / 12) + "′" + (n % 12) + "″" : ""; }
+function initials(name) { return String(name || "?").split(/\s+/).slice(0, 2).map(function (w) { return w.charAt(0).toUpperCase(); }).join(""); }
+function timeAgo(ms) {
+  var s = Math.max(1, Math.round((Date.now() - ms) / 1000));
+  if (s < 3600) return Math.max(1, Math.round(s / 60)) + " min ago";
+  if (s < 86400) return Math.round(s / 3600) + " hr ago";
+  return new Date(ms).toLocaleDateString([], { month: "short", day: "numeric" });
+}
+
+/* ---------- Start ---------- */
+async function init() {
+  var t = await api("/fan/teams");
+  S.teams = (t.data && t.data.teams) || [];
+  var r = await api("/recruit/me");
+  if (r.status === 401) { show("v-login"); return; }
+  if (!r.ok) { $("loading").textContent = r.data.error || "Could not load. Please try again."; return; }
+  S.me = r.data;
+  route();
+}
+
+function route() {
+  var app = S.me.app;
+  if (!app) { buildApply(); show("v-apply"); return; }
+  if (app.status !== "approved") { buildStatus(app); show("v-status"); return; }
+  buildMain();
+  show("v-main");
+}
+
+/* ---------- Request access ---------- */
+var applyReady = false;
+function buildApply() {
+  if (applyReady) return;
+  applyReady = true;
+  var y = "";
+  for (var i = 2026; i <= 2032; i++) y += '<option value="' + i + '">' + i + "</option>";
+  $("p-year").innerHTML = y;
+  var opts = "";
+  ["SWAC", "MEAC"].forEach(function (conf) {
+    opts += '<optgroup label="' + conf + '">' + S.teams.filter(function (t) { return t.conf === conf; })
+      .map(function (t) { return '<option value="' + esc(t.id) + '">' + esc(t.name) + "</option>"; }).join("") + "</optgroup>";
+  });
+  $("c-team").innerHTML = opts;
+  $("role-player").addEventListener("click", function () { setRole("player"); });
+  $("role-coach").addEventListener("click", function () { setRole("coach"); });
+  $("p-dob").addEventListener("change", checkGuardian);
+  $("p-dob").addEventListener("input", checkGuardian);
+  $("form-player").addEventListener("submit", submitPlayer);
+  $("form-coach").addEventListener("submit", submitCoach);
+}
+function setRole(role) {
+  $("role-player").classList.toggle("active", role === "player");
+  $("role-coach").classList.toggle("active", role === "coach");
+  $("form-player").hidden = role !== "player";
+  $("form-coach").hidden = role !== "coach";
+}
+function ageNow(dob) {
+  var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dob || "");
+  if (!m) return null;
+  var now = new Date(), age = now.getFullYear() - +m[1];
+  if (now.getMonth() + 1 < +m[2] || (now.getMonth() + 1 === +m[2] && now.getDate() < +m[3])) age--;
+  return age;
+}
+function checkGuardian() {
+  var age = ageNow($("p-dob").value);
+  $("guardian-box").hidden = !(age !== null && age < 18);
+}
+async function submitPlayer(event) {
+  event.preventDefault();
+  $("p-error").textContent = "";
+  var body = {
+    role: "player", fullName: $("p-name").value, birthDate: $("p-dob").value, level: $("p-level").value,
+    sport: $("p-sport").value, gradYear: $("p-year").value, hsSchool: $("p-school").value, city: $("p-city").value,
+    state: $("p-state").value, refName: $("p-ref-name").value, refContact: $("p-ref-contact").value,
+    agree: $("p-agree").checked
+  };
+  var age = ageNow(body.birthDate);
+  if (age !== null && age < 18) {
+    body.guardian = { name: $("g-name").value, relationship: $("g-rel").value, phone: $("g-phone").value, email: $("g-email").value, consent: $("g-consent").checked };
+  }
+  var r = await api("/recruit/apply", body);
+  if (!r.ok) { $("p-error").textContent = r.data.error || "Could not send your request."; return; }
+  S.me.app = r.data.app;
+  route();
+}
+async function submitCoach(event) {
+  event.preventDefault();
+  $("c-error").textContent = "";
+  var sports = Array.prototype.filter.call(document.querySelectorAll(".c-sport"), function (c) { return c.checked; })
+    .map(function (c) { return c.value; });
+  var r = await api("/recruit/apply", {
+    role: "coach", fullName: $("c-name").value, teamId: $("c-team").value, title: $("c-title").value, sports: sports,
+    staffUrl: $("c-staff").value, schoolEmail: $("c-email").value, agree: $("c-agree").checked
+  });
+  if (!r.ok) { $("c-error").textContent = r.data.error || "Could not send your request."; return; }
+  S.me.app = r.data.app;
+  route();
+}
+
+/* ---------- Waiting, rejected, suspended ---------- */
+function buildStatus(app) {
+  var t = $("st-title"), x = $("st-text"), n = $("st-note"), a = $("st-actions");
+  n.textContent = ""; a.innerHTML = "";
+  if (app.status === "pending") {
+    t.textContent = "Request received";
+    x.textContent = "A person at HBCU Surge is reviewing your request. We may contact your reference or, for players under 18, your parent or guardian. This page will unlock when you are approved. Come back and refresh to check.";
+    a.innerHTML = '<button class="btn btn-plain" id="st-check" type="button">Check again</button> <button class="mini-btn" id="st-del" type="button">Withdraw my request</button>';
+  } else if (app.status === "rejected") {
+    t.textContent = "Request not approved";
+    x.textContent = "We couldn't verify this request. You can fix the details and ask again.";
+    n.textContent = app.note ? "Note from the reviewer: " + app.note : "";
+    a.innerHTML = '<button class="btn" id="st-again" type="button">Request again</button>';
+  } else {
+    t.textContent = "Account suspended";
+    x.textContent = "This recruiting account is suspended. Use the contact address on the rules page if you think this is a mistake.";
+    a.innerHTML = '<button class="mini-btn" id="st-del" type="button">Delete my recruiting data</button>';
+  }
+  var check = $("st-check"), del = $("st-del"), again = $("st-again");
+  if (check) check.addEventListener("click", async function () { var r = await api("/recruit/me"); if (r.ok) { S.me = r.data; route(); } });
+  if (del) del.addEventListener("click", deleteMyData);
+  if (again) again.addEventListener("click", async function () { S.me.app = null; route(); });
+}
+async function deleteMyData() {
+  if (!window.confirm("Delete your recruiting request, profile and messages? This can't be undone.")) return;
+  var r = await api("/recruit/delete-my-data", { confirm: "DELETE" });
+  if (r.ok) { var m = await api("/recruit/me"); if (m.ok) { S.me = m.data; applyReady = applyReady; route(); } }
+}
+
+/* ---------- Main area ---------- */
+function buildMain() {
+  var app = S.me.app;
+  $("m-name").textContent = app.fullName;
+  $("m-role").textContent = app.role === "coach" ? "Coach · " + app.teamName : "Player · " + (SPORT_NAMES[app.sport] || "");
+  S.tab = app.role === "coach" ? "find" : "profile";
+  renderTabs();
+  renderTab();
+  if (S.timer) clearInterval(S.timer);
+  S.timer = setInterval(poll, 25000);
+}
+function tabsFor(role) {
+  return role === "coach"
+    ? [["find", "Find players"], ["board", "My board"], ["mail", "Messages"], ["account", "Account"]]
+    : [["profile", "My profile"], ["mail", "Messages"], ["account", "Account"]];
+}
+function renderTabs() {
+  $("m-tabs").innerHTML = tabsFor(S.me.app.role).map(function (t) {
+    var badge = t[0] === "mail" && S.me.unread ? ' <span class="dot">' + S.me.unread + "</span>" : "";
+    return '<button class="rc-tab' + (S.tab === t[0] ? " active" : "") + '" data-tab="' + t[0] + '" type="button">' + t[1] + badge + "</button>";
+  }).join("");
+}
+$("m-tabs").addEventListener("click", function (event) {
+  var b = event.target.closest("[data-tab]");
+  if (!b) return;
+  S.tab = b.dataset.tab;
+  renderTabs();
+  renderTab();
+});
+function renderTab() {
+  if (S.tab === "profile") renderProfileEditor();
+  else if (S.tab === "find") renderFind();
+  else if (S.tab === "board") renderBoard();
+  else if (S.tab === "mail") renderMail();
+  else renderAccount();
+}
+async function poll() {
+  if (document.hidden || !S.me || !S.me.app || S.me.app.status !== "approved") return;
+  var r = await api("/recruit/me");
+  if (r.ok) { S.me.unread = r.data.unread; renderTabs(); }
+  if (S.tab === "mail") { await loadThreads(false); if (S.convo) openConvo(S.convo, false); }
+}
+
+/* ---------- Profile card (shared) ---------- */
+function profileHtml(p, forCoach) {
+  var tiles = [];
+  if (p.position) tiles.push(["Position", p.position + (p.position2 ? " / " + p.position2 : "")]);
+  if (p.height) tiles.push(["Height", fmtHeight(p.height)]);
+  if (p.weight) tiles.push(["Weight", p.weight + " lbs"]);
+  tiles.push(["Class", p.gradYear]);
+  if (p.gpa !== null && p.gpa !== undefined && p.gpa !== "") tiles.push(["GPA", Number(p.gpa).toFixed(2)]);
+  if (p.sat) tiles.push(["SAT", p.sat]);
+  if (p.act) tiles.push(["ACT", p.act]);
+  var status = p.status === "committed" ? "Committed" + (p.committedTo ? ": " + p.committedTo : "")
+    : p.status === "signed" ? "Signed" + (p.committedTo ? ": " + p.committedTo : "") : "Open to offers";
+  var meas = Object.keys(p.measurables || {}).map(function (k) {
+    return "<tr><td>" + esc(MEAS_LABELS[k] || k) + "</td><td>" + esc(p.measurables[k]) + "</td></tr>";
+  }).join("");
+  var stats = (p.stats || []).map(function (r) { return "<tr><td>" + esc(r.season) + "</td><td>" + esc(r.line) + "</td></tr>"; }).join("");
+  var offers = (p.offers || []).map(function (o) {
+    return "<tr><td>" + esc(o.school) + "</td><td>" + esc({ offer: "Offer", interest: "Interest", visit: "Visit" }[o.status] || o.status) + "</td></tr>";
+  }).join("");
+  var video = "";
+  if (p.highlightUrl && /^https:\/\//.test(p.highlightUrl)) {
+    video = '<h3>Highlights</h3><p><a class="btn btn-dark" style="display:inline-block;text-decoration:none;line-height:1.7" href="' + esc(p.highlightUrl) + '" target="_blank" rel="noopener noreferrer">Watch highlight video</a></p>';
+  }
+  return '<article class="card prof"><div class="prof-hero"><div class="avatar" aria-hidden="true">' + esc(initials(p.name)) + "</div><div>" +
+    "<h2>" + esc(p.name) + "</h2>" +
+    '<div class="prof-sub">' + esc(SPORT_NAMES[p.sport]) + " · Class of " + esc(p.gradYear) + " · " + esc(p.hsSchool) + ", " + esc(p.city) + ", " + esc(p.state) + "</div>" +
+    '<div class="prof-badges"><span class="rc-badge ' + (p.status === "open" ? "good" : "warn") + '">' + esc(status) + "</span>" +
+    (forCoach && p.minor ? '<span class="rc-badge warn">Under 18</span>' : "") + '<span class="rc-badge">Approved by HBCU Surge</span></div></div></div>' +
+    '<div class="prof-body"><div class="tiles">' + tiles.map(function (t) { return '<div class="tile"><b>' + esc(t[1]) + "</b><span>" + esc(t[0]) + "</span></div>"; }).join("") + "</div>" +
+    (p.club ? "<h3>Club / AAU team</h3><p>" + esc(p.club) + "</p>" : "") +
+    (p.major ? "<h3>Academic interest</h3><p>" + esc(p.major) + "</p>" : "") +
+    (meas ? '<h3>Measurables <span class="muted">(self-reported)</span></h3><table class="kv">' + meas + "</table>" : "") +
+    (stats ? '<h3>Season stats <span class="muted">(self-reported)</span></h3><table class="kv">' + stats + "</table>" : "") +
+    video +
+    (p.bio ? "<h3>About</h3><p style=\"white-space:pre-wrap\">" + esc(p.bio) + "</p>" : "") +
+    (offers ? '<h3>Offers and interest <span class="muted">(self-reported)</span></h3><table class="kv">' + offers + "</table>" : "") +
+    '<p class="prof-foot">The player and parent or guardian entered this information. HBCU Surge approved the account but has not checked every detail. Verify stats and academics yourself.</p></div></article>';
+}
+
+/* ---------- Player: profile editor ---------- */
+function statRow(r) {
+  return '<div class="rc-row"><label class="field">Season<input class="st-season" maxlength="20" value="' + esc(r.season) + '"></label>' +
+    '<label class="field">Numbers<input class="st-line" maxlength="140" value="' + esc(r.line) + '" placeholder="e.g. 62 rec, 940 yds, 9 TD"></label>' +
+    '<button class="mini-btn rm-row" type="button">Remove</button></div>';
+}
+function offerRow(o) {
+  var s = o.status || "interest";
+  return '<div class="rc-row"><label class="field">School<input class="of-school" maxlength="60" value="' + esc(o.school) + '"></label>' +
+    '<label class="field">Status<select class="of-status"><option value="interest"' + (s === "interest" ? " selected" : "") + '>Interest</option><option value="visit"' + (s === "visit" ? " selected" : "") + '>Visit</option><option value="offer"' + (s === "offer" ? " selected" : "") + '>Offer</option></select></label>' +
+    '<button class="mini-btn rm-row" type="button">Remove</button></div>';
+}
+function renderProfileEditor() {
+  var p = S.me.profile;
+  var ft = p.height ? Math.floor(p.height / 12) : "", inch = p.height ? p.height % 12 : "";
+  var posOpts = function (sel) {
+    return '<option value=""></option>' + S.me.positions.map(function (x) { return '<option' + (x === sel ? " selected" : "") + ">" + x + "</option>"; }).join("");
+  };
+  var meas = Object.keys(S.me.measurables).map(function (k) {
+    var v = (p.measurables || {})[k];
+    return '<label class="field">' + esc(S.me.measurables[k][2]) + '<input class="mz" data-k="' + k + '" inputmode="decimal" value="' + (v == null ? "" : esc(v)) + '"></label>';
+  }).join("");
+  $("m-panel").innerHTML = '<div class="rc-grid"><form class="card" id="pf" novalidate>' +
+    "<h2>Build your profile</h2>" +
+    '<p class="muted">Name, class, school and sport come from your approved request. Coaches can find you only when you turn your profile on.</p>' +
+    '<div class="rc-form-grid"><label class="field">Position<select id="pf-pos">' + posOpts(p.position) + '</select></label>' +
+    '<label class="field">Second position<select id="pf-pos2">' + posOpts(p.position2) + "</select></label></div>" +
+    '<div class="rc-form-grid"><label class="field">Height (ft)<input id="pf-ft" inputmode="numeric" value="' + ft + '"></label>' +
+    '<label class="field">Height (in)<input id="pf-in" inputmode="numeric" value="' + inch + '"></label>' +
+    '<label class="field">Weight (lbs)<input id="pf-wt" inputmode="numeric" value="' + (p.weight || "") + '"></label></div>' +
+    '<div class="rc-section"><h3>Academics</h3><div class="rc-form-grid"><label class="field">GPA<input id="pf-gpa" inputmode="decimal" value="' + (p.gpa == null ? "" : p.gpa) + '"></label>' +
+    '<label class="field">SAT<input id="pf-sat" inputmode="numeric" value="' + (p.sat || "") + '"></label>' +
+    '<label class="field">ACT<input id="pf-act" inputmode="numeric" value="' + (p.act || "") + '"></label></div>' +
+    '<label class="field">Academic interest<input id="pf-major" maxlength="60" value="' + esc(p.major) + '" placeholder="Business, nursing, engineering..."></label></div>' +
+    '<div class="rc-section"><h3>Measurables</h3><div class="rc-form-grid">' + meas + "</div>" +
+    '<label class="field">Club or AAU team<input id="pf-club" maxlength="60" value="' + esc(p.club) + '"></label></div>' +
+    '<div class="rc-section"><h3>Season stats</h3><div id="stat-rows">' + (p.stats || []).map(statRow).join("") + '</div><button class="btn btn-plain" id="add-stat" type="button">Add a season</button></div>' +
+    '<div class="rc-section"><h3>Highlights and about</h3><label class="field">Highlight video link<small> (YouTube, Hudl or Vimeo, starting with https://)</small><input id="pf-video" type="url" value="' + esc(p.highlightUrl) + '"></label>' +
+    '<label class="field">About me<small> (up to 600 characters. No emails, phone numbers or links)</small><textarea id="pf-bio" maxlength="600">' + esc(p.bio) + "</textarea></label></div>" +
+    '<div class="rc-section"><h3>Recruiting status</h3><div class="rc-two"><label class="field">Status<select id="pf-status"><option value="open"' + (p.status === "open" ? " selected" : "") + '>Open to offers</option><option value="committed"' + (p.status === "committed" ? " selected" : "") + '>Committed</option><option value="signed"' + (p.status === "signed" ? " selected" : "") + '>Signed</option></select></label>' +
+    '<label class="field">School<input id="pf-committed" maxlength="60" value="' + esc(p.committedTo) + '"></label></div>' +
+    '<h3 style="margin-top:0.8rem">Offers and interest</h3><div id="offer-rows">' + (p.offers || []).map(offerRow).join("") + '</div><button class="btn btn-plain" id="add-offer" type="button">Add a school</button></div>' +
+    '<div class="rc-section"><h3>Who can see you</h3>' +
+    '<label class="check"><input type="checkbox" id="pf-active"' + (p.active ? " checked" : "") + '><span><b>Show my profile to verified coaches.</b> Only approved SWAC and MEAC coaches who recruit your sport can see it. Needs a position, height and weight.</span></label>' +
+    '<label class="check"><input type="checkbox" id="pf-msg"' + (p.allowMessages ? " checked" : "") + '><span><b>Let those coaches message me here.</b> Your email and phone stay hidden. You can block or report any coach.</span></label></div>' +
+    '<button class="btn btn-wide" type="submit">Save profile</button><p class="rc-ok" id="pf-ok" role="status"></p><p class="error" id="pf-err" role="alert"></p></form>' +
+    '<div><h3 style="margin-bottom:0.5rem">How coaches see you</h3><div id="pf-preview"></div></div></div>';
+  var form = $("pf");
+  form.addEventListener("input", updatePreview);
+  form.addEventListener("change", updatePreview);
+  form.addEventListener("submit", saveProfile);
+  $("add-stat").addEventListener("click", function () {
+    if ($("stat-rows").children.length >= 6) return;
+    $("stat-rows").insertAdjacentHTML("beforeend", statRow({ season: "", line: "" }));
+  });
+  $("add-offer").addEventListener("click", function () {
+    if ($("offer-rows").children.length >= 8) return;
+    $("offer-rows").insertAdjacentHTML("beforeend", offerRow({ school: "", status: "interest" }));
+  });
+  form.addEventListener("click", function (event) {
+    var rm = event.target.closest(".rm-row");
+    if (rm) { rm.parentNode.remove(); updatePreview(); }
+  });
+  updatePreview();
+}
+function readForm() {
+  var p = S.me.profile;
+  var ft = parseInt($("pf-ft").value, 10) || 0, inch = parseInt($("pf-in").value, 10) || 0;
+  var m = {};
+  Array.prototype.forEach.call(document.querySelectorAll(".mz"), function (el) { if (el.value !== "") m[el.dataset.k] = el.value; });
+  return {
+    position: $("pf-pos").value, position2: $("pf-pos2").value, height: (ft || inch) ? ft * 12 + inch : "",
+    weight: $("pf-wt").value, gpa: $("pf-gpa").value, sat: $("pf-sat").value, act: $("pf-act").value, major: $("pf-major").value,
+    club: $("pf-club").value, measurables: m,
+    stats: Array.prototype.map.call($("stat-rows").children, function (row) {
+      return { season: row.querySelector(".st-season").value, line: row.querySelector(".st-line").value };
+    }),
+    highlightUrl: $("pf-video").value, bio: $("pf-bio").value, status: $("pf-status").value, committedTo: $("pf-committed").value,
+    offers: Array.prototype.map.call($("offer-rows").children, function (row) {
+      return { school: row.querySelector(".of-school").value, status: row.querySelector(".of-status").value };
+    }),
+    allowMessages: $("pf-msg").checked, active: $("pf-active").checked
+  };
+}
+function updatePreview() {
+  var f = readForm(), p = S.me.profile;
+  var view = Object.assign({}, p, f, {
+    height: f.height ? Number(f.height) : null, weight: f.weight ? Number(f.weight) : null,
+    gpa: f.gpa === "" ? null : Number(f.gpa), sat: f.sat, act: f.act,
+    stats: f.stats.filter(function (r) { return r.season || r.line; }), offers: f.offers.filter(function (o) { return o.school; })
+  });
+  $("pf-preview").innerHTML = profileHtml(view, false);
+}
+async function saveProfile(event) {
+  event.preventDefault();
+  $("pf-ok").textContent = ""; $("pf-err").textContent = "";
+  var r = await api("/recruit/profile", readForm());
+  if (!r.ok) { $("pf-err").textContent = r.data.error || "Could not save."; return; }
+  S.me.profile = r.data.profile;
+  $("pf-ok").textContent = "Saved. " + (r.data.profile.active ? "Your profile is visible to verified coaches." : "Your profile is hidden from coaches.");
+  updatePreview();
+}
+
+/* ---------- Coach: find players ---------- */
+function renderFind() {
+  var app = S.me.app, f = S.filters;
+  var sports = app.sports.length > 1 ? '<option value="">All my sports</option>' : "";
+  sports += app.sports.map(function (s) { return '<option value="' + s + '"' + (f.sport === s ? " selected" : "") + ">" + SPORT_NAMES[s] + "</option>"; }).join("");
+  var yrs = '<option value="">Any</option>';
+  for (var y = 2026; y <= 2032; y++) yrs += '<option value="' + y + '"' + (String(f.year) === String(y) ? " selected" : "") + ">" + y + "</option>";
+  var posSet = {};
+  (f.sport ? [f.sport] : app.sports).forEach(function (s) { POSITIONS[s].forEach(function (p) { posSet[p] = 1; }); });
+  var pos = '<option value="">Any</option>' + Object.keys(posSet).map(function (p) { return '<option' + (f.pos === p ? " selected" : "") + ">" + p + "</option>"; }).join("");
+  $("m-panel").innerHTML = '<form class="card" id="ff"><h2>Find players</h2>' +
+    '<div class="rc-note">You only see players who turned their profile on and who play a sport you recruit for. Follow NCAA, NAIA and school contact rules. Never ask a player to move the conversation off this site.</div>' +
+    '<div class="filters"><label class="field">Sport<select id="f-sport">' + sports + "</select></label>" +
+    '<label class="field">Class<select id="f-year">' + yrs + "</select></label>" +
+    '<label class="field">Position<select id="f-pos">' + pos + "</select></label>" +
+    '<label class="field">State<input id="f-state" maxlength="2" value="' + esc(f.state) + '" placeholder="MS"></label>' +
+    '<label class="field">Status<select id="f-status"><option value="">Any</option><option value="open"' + (f.status === "open" ? " selected" : "") + '>Open to offers</option><option value="committed"' + (f.status === "committed" ? " selected" : "") + '>Committed</option><option value="signed"' + (f.status === "signed" ? " selected" : "") + '>Signed</option></select></label>' +
+    '<label class="field">Min GPA<input id="f-gpa" inputmode="decimal" value="' + esc(f.minGpa) + '"></label>' +
+    '<label class="field">Name or school<input id="f-q" value="' + esc(f.q) + '"></label></div>' +
+    '<button class="btn" type="submit">Search</button></form><div id="results" style="margin-top:1rem"></div>';
+  $("f-sport").addEventListener("change", function () { S.filters.sport = $("f-sport").value; S.filters.pos = ""; renderFind(); });
+  $("ff").addEventListener("submit", function (event) {
+    event.preventDefault();
+    S.filters = { sport: $("f-sport").value, year: $("f-year").value, pos: $("f-pos").value, state: $("f-state").value, status: $("f-status").value, minGpa: $("f-gpa").value, q: $("f-q").value };
+    runSearch();
+  });
+  runSearch();
+}
+function listHtml(players) {
+  if (!players.length) return '<div class="card muted">No players match yet. Profiles appear here when players turn them on.</div>';
+  return '<div class="plist">' + players.map(function (p) {
+    return '<button class="pitem" type="button" data-id="' + esc(p.id) + '"><span><b>' + esc(p.name) + "</b>" +
+      "<small>" + esc(SPORT_NAMES[p.sport]) + " · " + esc(p.position || "No position yet") + " · Class of " + esc(p.gradYear) + (p.height ? " · " + fmtHeight(p.height) : "") + (p.weight ? " " + p.weight + " lbs" : "") + "</small>" +
+      "<small>" + esc(p.hsSchool) + ", " + esc(p.city) + ", " + esc(p.state) + (p.gpa !== null ? " · GPA " + Number(p.gpa).toFixed(2) : "") + "</small></span>" +
+      '<span class="right">' + (p.status !== "open" ? esc(p.status) + "<br>" : "") + (p.minor ? "Under 18<br>" : "") + "Profile " + p.complete + "%<br>Updated " + timeAgo(p.updated) + "</span></button>";
+  }).join("") + "</div>";
+}
+async function runSearch() {
+  var f = S.filters;
+  var q = "sport=" + encodeURIComponent(f.sport) + "&year=" + encodeURIComponent(f.year) + "&pos=" + encodeURIComponent(f.pos) +
+    "&state=" + encodeURIComponent(f.state) + "&status=" + encodeURIComponent(f.status) + "&minGpa=" + encodeURIComponent(f.minGpa) + "&q=" + encodeURIComponent(f.q);
+  $("results").innerHTML = '<div class="card muted">Searching&hellip;</div>';
+  var r = await api("/recruit/players?" + q);
+  if (!r.ok) { $("results").innerHTML = '<div class="card error">' + esc(r.data.error || "Could not search.") + "</div>"; return; }
+  $("results").innerHTML = '<p class="muted" style="margin-bottom:0.5rem">' + r.data.total + " player" + (r.data.total === 1 ? "" : "s") + (r.data.total > 60 ? " (showing 60, narrow your search)" : "") + "</p>" + listHtml(r.data.players);
+}
+async function renderBoard() {
+  $("m-panel").innerHTML = '<div class="card"><h2>My board</h2><p class="muted">Players you saved. Players who turn their profile off disappear from this list.</p></div><div id="results" style="margin-top:1rem"></div>';
+  var r = await api("/recruit/board");
+  $("results").innerHTML = r.ok ? listHtml(r.data.players) : '<div class="card error">' + esc(r.data.error || "Could not load.") + "</div>";
+}
+$("m-panel").addEventListener("click", function (event) {
+  var item = event.target.closest(".pitem");
+  if (item) openPlayer(item.dataset.id);
+});
+
+async function openPlayer(id) {
+  var r = await api("/recruit/player?id=" + encodeURIComponent(id));
+  if (!r.ok) { window.alert(r.data.error || "That profile isn't available."); return; }
+  var p = r.data.profile;
+  var msg = p.threadId ? '<button class="btn" id="pl-open" type="button">Open conversation</button>'
+    : p.allowMessages ? '<button class="btn" id="pl-msg" type="button">Message player</button>'
+    : '<span class="muted">This player isn\'t accepting messages right now.</span>';
+  $("m-panel").innerHTML = '<p><button class="btn btn-plain" id="pl-back" type="button">&larr; Back</button></p>' +
+    '<div class="prof-actions">' + msg + '<button class="btn btn-plain" id="pl-board" type="button">' + (p.onBoard ? "Remove from board" : "Add to board") + "</button></div>" +
+    '<div id="pl-compose" hidden class="card" style="margin-bottom:1rem"><h3>First message</h3><p class="muted">Introduce yourself and your program. Contact details and links can\'t be shared here.</p>' +
+    '<textarea id="pl-text" maxlength="1000" style="width:100%;min-height:110px;padding:0.6rem;border:1px solid var(--field);border-radius:6px;font-size:16px;background:var(--card);color:var(--text)"></textarea>' +
+    '<p style="margin-top:0.6rem"><button class="btn" id="pl-send" type="button">Send</button></p><p class="error" id="pl-err" role="alert"></p></div>' + profileHtml(p, true);
+  $("pl-back").addEventListener("click", renderTab);
+  $("pl-board").addEventListener("click", async function () {
+    var b = await api("/recruit/board", { id: p.id, on: !p.onBoard });
+    if (b.ok) { p.onBoard = !p.onBoard; $("pl-board").textContent = p.onBoard ? "Remove from board" : "Add to board"; }
+  });
+  if ($("pl-open")) $("pl-open").addEventListener("click", function () { S.tab = "mail"; S.convo = p.threadId; renderTabs(); renderTab(); });
+  if ($("pl-msg")) $("pl-msg").addEventListener("click", function () { $("pl-compose").hidden = false; $("pl-text").focus(); });
+  if ($("pl-send")) $("pl-send").addEventListener("click", async function () {
+    $("pl-err").textContent = "";
+    var s = await api("/recruit/start", { playerId: p.id, text: $("pl-text").value });
+    if (!s.ok) { $("pl-err").textContent = s.data.error || "Could not send."; return; }
+    S.tab = "mail"; S.convo = s.data.threadId; renderTabs(); renderTab();
+  });
+}
+
+/* ---------- Messages ---------- */
+function renderMail() {
+  $("m-panel").innerHTML = '<div class="mail"><div><h3>Conversations</h3><div class="tlist" id="tlist"><p class="muted">Loading&hellip;</p></div></div><div class="card" id="convo-box"><p class="muted">Choose a conversation.</p></div></div>';
+  $("tlist").addEventListener("click", function (event) {
+    var b = event.target.closest("[data-id]");
+    if (b) openConvo(b.dataset.id, true);
+  });
+  loadThreads(true).then(function () { if (S.convo) openConvo(S.convo, true); });
+}
+async function loadThreads() {
+  var r = await api("/recruit/threads");
+  if (!r.ok || S.tab !== "mail" || !$("tlist")) return;
+  var list = r.data.threads;
+  S.me.unread = list.reduce(function (s, t) { return s + t.unread; }, 0);
+  renderTabs();
+  $("tlist").innerHTML = list.length === 0
+    ? '<p class="muted">' + (S.me.app.role === "coach" ? "No conversations yet. Open a player's profile to start one." : "No messages yet. Coaches can message you when your profile and messaging are turned on.") + "</p>"
+    : list.map(function (t) {
+      return '<button class="titem' + (t.id === S.convo ? " active" : "") + '" type="button" data-id="' + esc(t.id) + '"><b><span>' + esc(t.with) + "</span>" + (t.unread ? '<span class="dot">' + t.unread + "</span>" : "") + "</b>" +
+        "<small>" + esc(t.detail) + (t.blocked ? " · blocked" : "") + "</small><small>" + esc(t.preview) + "</small></button>";
+    }).join("");
+}
+async function openConvo(id, scroll) {
+  S.convo = id;
+  var r = await api("/recruit/thread?id=" + encodeURIComponent(id));
+  if (!r.ok || !$("convo-box")) return;
+  var isPlayer = S.me.app.role === "player";
+  var bubbles = r.data.messages.map(function (m) {
+    return '<div class="bub' + (m.mine ? " mine" : "") + '">' + esc(m.text) + "<small>" + new Date(m.time).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) + "</small></div>";
+  }).join("");
+  var box = $("convo-box");
+  var typed = $("cv-text") ? $("cv-text").value : "";
+  box.innerHTML = '<div class="convo" id="convo">' + bubbles + "</div>" +
+    (r.data.blocked ? '<p class="muted" style="margin-top:0.6rem">This conversation is closed.</p>'
+      : '<div class="compose"><textarea id="cv-text" maxlength="1000" placeholder="Write a message"></textarea><button class="btn" id="cv-send" type="button">Send</button></div>') +
+    '<p class="error" id="cv-err" role="alert"></p><p style="margin-top:0.4rem">' +
+    '<button class="mini-btn" id="cv-report" type="button">Report this conversation</button>' +
+    (isPlayer ? ' <button class="mini-btn" id="cv-block" type="button">' + (r.data.blocked ? "Unblock this coach" : "Block this coach") + "</button>" : "") + "</p>";
+  if ($("cv-text")) $("cv-text").value = typed;
+  var c = $("convo");
+  if (scroll) c.scrollTop = c.scrollHeight;
+  if ($("cv-send")) $("cv-send").addEventListener("click", async function () {
+    var text = $("cv-text").value;
+    var s = await api("/recruit/send", { threadId: id, text: text });
+    if (!s.ok) { $("cv-err").textContent = s.data.error || "Could not send."; return; }
+    $("cv-text").value = "";
+    await openConvo(id, true);
+    loadThreads();
+  });
+  $("cv-report").addEventListener("click", async function () {
+    var why = window.prompt("What is wrong? A person at HBCU Surge will read this conversation.");
+    if (why === null) return;
+    var s = await api("/recruit/report", { threadId: id, reason: why });
+    $("cv-err").textContent = s.ok ? "Thank you. We will review it." : (s.data.error || "Could not send the report.");
+  });
+  if ($("cv-block")) $("cv-block").addEventListener("click", async function () {
+    var s = await api("/recruit/block", { threadId: id, on: !r.data.blocked });
+    if (s.ok) { await openConvo(id, false); loadThreads(); }
+  });
+  loadThreads();
+}
+
+/* ---------- Account ---------- */
+function renderAccount() {
+  var app = S.me.app;
+  $("m-panel").innerHTML = '<div class="card rc-narrow" style="margin:0"><h2>Your account</h2>' +
+    "<p>Signed in as <strong>" + esc(S.me.username) + "</strong>. " + (app.role === "coach" ? "Coach at " + esc(app.teamName) + "." : "Player.") + "</p>" +
+    '<p class="muted">Reviewers can see the details you gave when you requested access (including a parent or guardian\'s contact details for players under 18). Coaches never see your email or phone. Messages are private to the two people in them, but a reviewer can read a conversation that is reported.</p>' +
+    '<div class="rc-section"><h3>Delete my recruiting data</h3><p class="muted">Removes your request, profile, messages and board. This can\'t be undone. Your Fan Talk account stays.</p>' +
+    '<button class="btn btn-dark" id="acc-del" type="button">Delete my recruiting data</button></div></div>';
+  $("acc-del").addEventListener("click", async function () {
+    if (!window.confirm("Delete your recruiting request, profile and messages? This can't be undone.")) return;
+    var r = await api("/recruit/delete-my-data", { confirm: "DELETE" });
+    if (r.ok) { if (S.timer) clearInterval(S.timer); var m = await api("/recruit/me"); S.me = m.data; route(); }
+  });
+}
+
+fetch("/fan/config").then(function (r) { return r.ok ? r.json() : {}; }).catch(function () { return {}; });
+init();
+
+</script>
+</body>
+</html>
