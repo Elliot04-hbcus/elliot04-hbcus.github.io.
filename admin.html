@@ -321,6 +321,12 @@ label.field input {
     <p class="muted" style="margin-bottom:0.6rem">A message with 3 reports is hidden automatically. "Keep" clears the reports and shows it again.</p>
     <div id="reported"></div></section>
   <section class="card"><h2>Users</h2><div id="users"></div></section>
+  <section class="card"><h2>Recruiting: access requests</h2>
+    <p class="muted" style="margin-bottom:0.6rem">Approve only people you have checked. <b>Coaches:</b> open the staff page link and confirm the person is listed at that school, and that the email ends in the school's .edu domain. <b>Players:</b> contact the reference. For players under 18, contact the parent or guardian before approving. Never approve someone you couldn't verify. These details are private: don't share them.</p>
+    <p id="r-error" class="error" role="alert"></p>
+    <div id="r-pending"></div></section>
+  <section class="card"><h2>Recruiting: reported conversations</h2><div id="r-reports"></div></section>
+  <section class="card"><h2>Recruiting: all accounts</h2><div id="r-people"></div></section>
 </div>
 </main>
 
@@ -408,6 +414,64 @@ document.addEventListener("click", function (event) {
   });
 });
 load();
+</script>
+<script>
+function rpost(action, body) {
+  return fetch("/recruit/admin/" + action, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
+    .then(function (r) { return r.json().catch(function () { return {}; }).then(function (d) { return { ok: r.ok, data: d }; }); });
+}
+function field(label, value) { return value ? "<tr><td><b>" + esc(label) + "</b></td><td>" + value + "</td></tr>" : ""; }
+function rcard(a) {
+  var rows = field("Site username", esc(a.username)) + field("Name", esc(a.fullName)) + field("Type", esc(a.role));
+  if (a.role === "coach") {
+    rows += field("School", esc(a.teamName)) + field("Title", esc(a.title)) + field("Sports", esc((a.sports || []).join(", "))) +
+      field("Staff page", '<a href="' + esc(a.staffUrl) + '" target="_blank" rel="noopener noreferrer">' + esc(a.staffUrl) + "</a>") + field("School email", esc(a.schoolEmail));
+  } else {
+    rows += field("Age group", a.minor ? "<b>Under 18</b> (born " + esc(a.birthYear) + ")" : "18 or older (born " + esc(a.birthYear) + ")") + field("Level", esc(a.level)) +
+      field("Sport / class", esc(a.sport) + " / " + esc(a.gradYear)) + field("School", esc(a.hsSchool) + ", " + esc(a.city) + ", " + esc(a.state)) +
+      field("Reference", esc(a.refName) + " (" + esc(a.refContact) + ")");
+    if (a.guardian) rows += field("Parent/guardian", esc(a.guardian.name) + " (" + esc(a.guardian.relationship) + ")") + field("Guardian phone", esc(a.guardian.phone)) + field("Guardian email", esc(a.guardian.email)) + field("Guardian consent", "Checked by the guardian");
+  }
+  return '<div class="card" style="margin-bottom:0.8rem;box-shadow:none;border:1px solid var(--line)"><table class="admin-table"><tbody>' + rows + '</tbody></table><div class="btn-row" style="margin-top:0.6rem">' +
+    '<button class="btn" data-ract="approve" data-id="' + esc(a.id) + '">Approve</button>' +
+    '<button class="btn btn-danger" data-ract="reject" data-id="' + esc(a.id) + '">Reject</button></div></div>';
+}
+function rload() {
+  fetch("/recruit/admin/overview").then(function (r) {
+    if (!r.ok) throw new Error("");
+    return r.json();
+  }).then(function (d) {
+    $("r-error").textContent = "";
+    $("r-pending").innerHTML = d.pending.length === 0 ? "<p>No requests waiting.</p>" : d.pending.map(rcard).join("");
+    $("r-reports").innerHTML = d.reports.length === 0 ? "<p>No reported conversations.</p>" : d.reports.map(function (r) {
+      return '<div class="card" style="margin-bottom:0.8rem;box-shadow:none;border:1px solid var(--line)"><p><b>Coach:</b> ' + esc(r.coachName) + " (" + esc(r.coachTeam) + ") &middot; <b>Player:</b> " + esc(r.playerName) + (r.playerMinor ? " (<b>under 18</b>)" : "") +
+        "</p><p><b>Reason:</b> " + esc(r.reason) + "</p>" + r.messages.map(function (m) { return "<p><em>" + esc(m.from) + ":</em> " + esc(m.text) + "</p>"; }).join("") +
+        '<div class="btn-row"><button class="btn btn-plain" data-ract="dismiss-report" data-id="' + esc(r.id) + '">Dismiss</button>' +
+        (r.coachId ? '<button class="btn btn-danger" data-ract="suspend" data-id="' + esc(r.coachId) + '">Suspend coach</button>' : "") + "</div></div>";
+    }).join("");
+    var people = d.approved.concat(d.suspended);
+    $("r-people").innerHTML = people.length === 0 ? "<p>No accounts yet.</p>" : '<div class="admin-scroll"><table class="admin-table"><thead><tr><th>Name</th><th>Type</th><th>Status</th><th>Actions</th></tr></thead><tbody>' +
+      people.map(function (p) {
+        return "<tr><td>" + esc(p.fullName) + "<br><small>" + esc(p.username) + "</small></td><td>" + esc(p.role) + (p.teamName ? "<br><small>" + esc(p.teamName) + "</small>" : "") + (p.minor ? "<br><small>under 18</small>" : "") + "</td><td>" + esc(p.status) + '</td><td><div class="btn-row">' +
+          (p.status === "approved" ? '<button class="btn btn-danger" data-ract="suspend" data-id="' + esc(p.id) + '">Suspend</button>' : '<button class="btn btn-plain" data-ract="restore" data-id="' + esc(p.id) + '">Restore</button>') + "</div></td></tr>";
+      }).join("") + "</tbody></table></div>";
+  }).catch(function () {
+    $("r-pending").innerHTML = ""; $("r-reports").innerHTML = ""; $("r-people").innerHTML = "";
+    $("r-error").textContent = "Recruiting moderator data could not be loaded. Log in on Fan Talk with a moderator account.";
+  });
+}
+document.addEventListener("click", function (event) {
+  var b = event.target.closest("[data-ract]");
+  if (!b) return;
+  var act = b.getAttribute("data-ract"), body = { id: b.getAttribute("data-id") };
+  if (act === "reject") { var note = window.prompt("Optional note the person will see:"); if (note === null) return; body.note = note; }
+  if (act === "suspend" && !window.confirm("Suspend this account?")) return;
+  rpost(act, body).then(function (res) {
+    if (!res.ok) { $("r-error").textContent = res.data.error || "That didn't work."; return; }
+    rload();
+  });
+});
+rload();
 </script>
 </body>
 </html>
