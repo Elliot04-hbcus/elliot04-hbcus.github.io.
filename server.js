@@ -4,7 +4,7 @@
 //  Start it with:  node server.js
 //
 //  Optional settings (environment variables):
-//    PORT, DATA_DIR            where to listen / where fan-data.json is kept
+//    PORT, DATA_DIR            where to listen / where fan-data.json and recruit-data.json are kept
 //    ADMIN_USERS               usernames that can open /admin (comma list)
 //    CONTACT_EMAIL             shown on the rules and privacy pages
 //    TRUST_PROXY=1             set when a host's proxy is in front (Render, Railway...)
@@ -168,8 +168,8 @@ function httpError(status, message) {
   return error;
 }
 
-// Reads a JSON request body (max 10 KB)
-function readJson(req) {
+// Reads a JSON request body (max 10 KB unless a bigger limit is given)
+function readJson(req, maxBytes) {
   return new Promise(function (resolve, reject) {
     if (!/application\/json/i.test(req.headers["content-type"] || "")) {
       reject(httpError(415, "Unsupported request."));
@@ -182,7 +182,7 @@ function readJson(req) {
     req.on("data", function (chunk) {
       if (tooBig) return;
       size += chunk.length;
-      if (size > 10000) {
+      if (size > (maxBytes || 10000)) {
         tooBig = true;
         reject(httpError(413, "Request too large."));
         return;
@@ -700,6 +700,585 @@ async function handleFan(req, res, url) {
 }
 
 // ---------------------------------------------------------------------
+//  Recruiting: a locked area for verified players and coaches.
+//  Everything here needs a Fan Talk login AND approval from an admin.
+//  Saved in recruit-data.json (separate from the Fan Talk data).
+//  Players and coaches only ever see each other through this area:
+//  email addresses and phone numbers are never shown, and messages that
+//  contain them are blocked.
+// ---------------------------------------------------------------------
+const RDATA_FILE = path.join(DATA_DIR, "recruit-data.json");
+let rdb = { apps: [], profiles: [], threads: [], messages: [], reports: [] };
+
+function loadRdb() {
+  try {
+    rdb = Object.assign(rdb, JSON.parse(fs.readFileSync(RDATA_FILE, "utf8")));
+  } catch (error) {
+    console.log("No saved recruiting data yet. A new file will be created.");
+  }
+}
+
+function saveRdb() {
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+  const temp = RDATA_FILE + ".tmp";
+  fs.writeFileSync(temp, JSON.stringify(rdb));
+  fs.renameSync(temp, RDATA_FILE);
+}
+
+loadRdb();
+
+const SPORTS = { football: "Football", mbb: "Men's basketball", wbb: "Women's basketball" };
+const POSITIONS = {
+  football: ["QB", "RB", "WR", "TE", "OL", "DL", "LB", "DB", "K", "P", "ATH"],
+  mbb: ["PG", "SG", "SF", "PF", "C", "G", "F"],
+  wbb: ["PG", "SG", "SF", "PF", "C", "G", "F"]
+};
+const MEASURABLES = {
+  football: { forty: [3.8, 7, "40-yard dash (sec)"], vertical: [10, 60, "Vertical (in)"], bench: [50, 600, "Bench (lbs)"], squat: [50, 900, "Squat (lbs)"] },
+  mbb: { wingspan: [60, 100, "Wingspan (in)"], vertical: [10, 60, "Vertical (in)"], sprint: [2, 6, "3/4 court sprint (sec)"] },
+  wbb: { wingspan: [55, 95, "Wingspan (in)"], vertical: [8, 50, "Vertical (in)"], sprint: [2, 6, "3/4 court sprint (sec)"] }
+};
+const VIDEO_HOSTS = ["youtube.com", "youtu.be", "hudl.com", "vimeo.com"];
+const MAX_THREAD_MESSAGES = 300;
+
+function rid() { return crypto.randomBytes(6).toString("hex"); }
+
+// Plain text only: no angle brackets or control characters
+function clean(value, max) {
+  return String(value == null ? "" : value)
+    .replace(/[\u0000-\u001f\u007f<>]/g, " ").replace(/\s+/g, " ").trim().slice(0, max);
+}
+
+function need(value, min, max, label) {
+  const text = clean(value, max);
+  if (text.length < min) throw httpError(400, label + " is required.");
+  return text;
+}
+
+function num(value, min, max, label, decimals) {
+  if (value === "" || value === null || value === undefined) return null;
+  const n = Number(value);
+  if (!isFinite(n) || n < min || n > max) throw httpError(400, label + " must be between " + min + " and " + max + ".");
+  const p = Math.pow(10, decimals || 0);
+  return Math.round(n * p) / p;
+}
+
+function httpsUrl(value, hosts, label) {
+  const text = String(value || "").trim();
+  if (!text) return "";
+  let u;
+  try { u = new URL(text); } catch (e) { throw httpError(400, label + " must be a full web address starting with https://"); }
+  if (u.protocol !== "https:") throw httpError(400, label + " must start with https://");
+  if (hosts) {
+    const host = u.hostname.toLowerCase().replace(/^www\./, "");
+    if (!hosts.some(function (h) { return host === h || host.endsWith("." + h); })) {
+      throw httpError(400, label + " must be a link from " + hosts.join(", ") + ".");
+    }
+  }
+  return u.href.slice(0, 300);
+}
+
+function checkText(text) {
+  const problem = text ? filterProblem(text, false) : "";
+  if (problem) throw httpError(400, problem);
+}
+
+function ageFrom(birthDate) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(birthDate || ""));
+  if (!m) throw httpError(400, "Please enter a valid date of birth.");
+  const y = +m[1], mo = +m[2], d = +m[3];
+  const check = new Date(Date.UTC(y, mo - 1, d));
+  if (check.getUTCFullYear() !== y || check.getUTCMonth() !== mo - 1 || check.getUTCDate() !== d) {
+    throw httpError(400, "Please enter a valid date of birth.");
+  }
+  const now = new Date();
+  let age = now.getUTCFullYear() - y;
+  if (now.getUTCMonth() + 1 < mo || (now.getUTCMonth() + 1 === mo && now.getUTCDate() < d)) age--;
+  if (age < 13) throw httpError(403, "Players must be 13 or older to use recruiting.");
+  if (age > 45) throw httpError(400, "Please check the date of birth.");
+  return { age: age, year: y };
+}
+
+function getApp(user) {
+  return rdb.apps.find(function (a) { return a.userId === user.id; }) || null;
+}
+
+function appById(id) {
+  return rdb.apps.find(function (a) { return a.id === id; }) || null;
+}
+
+function requireApproved(user, role) {
+  const app = getApp(user);
+  if (!app) throw httpError(403, "Request access first.");
+  if (app.status === "pending") throw httpError(403, "Your request is still being reviewed.");
+  if (app.status === "rejected") throw httpError(403, "Your request was not approved.");
+  if (app.status === "suspended") throw httpError(403, "This recruiting account is suspended.");
+  if (role && app.role !== role) throw httpError(403, "That isn't available for your account type.");
+  return app;
+}
+
+function teamOf(app) { return app.role === "coach" ? teamName(app.teamId) : ""; }
+
+// What a person sees about their own request
+function myApp(app) {
+  return {
+    id: app.id, role: app.role, status: app.status, note: app.status === "rejected" ? app.note || "" : "",
+    fullName: app.fullName, minor: !!app.minor, sport: app.sport || "", sports: app.sports || [],
+    teamId: app.teamId || "", teamName: teamOf(app), title: app.title || "", level: app.level || ""
+  };
+}
+
+function ensureProfile(app) {
+  let p = rdb.profiles.find(function (x) { return x.userId === app.userId; });
+  if (!p) {
+    p = {
+      id: rid(), userId: app.userId, active: false, allowMessages: false, sport: app.sport, gradYear: app.gradYear,
+      hsSchool: app.hsSchool, city: app.city, state: app.state, position: "", position2: "", height: null,
+      weight: null, club: "", gpa: null, sat: null, act: null, major: "", measurables: {}, stats: [],
+      highlightUrl: "", bio: "", status: "open", committedTo: "", offers: [], updated: Date.now()
+    };
+    rdb.profiles.push(p);
+  }
+  return p;
+}
+
+function completeness(p) {
+  const checks = [p.position, p.height, p.weight, p.gpa !== null, p.highlightUrl, p.bio,
+    Object.keys(p.measurables || {}).length > 0, (p.stats || []).length > 0, p.major, p.sat || p.act];
+  return Math.round(checks.filter(Boolean).length / checks.length * 100);
+}
+
+function summaryOf(p, app) {
+  return {
+    id: p.id, name: app.fullName, sport: p.sport, position: p.position, gradYear: p.gradYear,
+    height: p.height, weight: p.weight, hsSchool: p.hsSchool, city: p.city, state: p.state, gpa: p.gpa,
+    status: p.status, minor: !!app.minor, level: app.level, allowMessages: !!p.allowMessages,
+    complete: completeness(p), updated: p.updated
+  };
+}
+
+function fullProfile(p, app) {
+  const s = summaryOf(p, app);
+  s.position2 = p.position2; s.club = p.club; s.sat = p.sat; s.act = p.act; s.major = p.major;
+  s.measurables = p.measurables; s.stats = p.stats; s.highlightUrl = p.highlightUrl; s.bio = p.bio;
+  s.committedTo = p.committedTo; s.offers = p.offers; s.active = !!p.active;
+  return s;
+}
+
+// ----- Requests for access -----
+async function recruitApply(req, res, user) {
+  if (limited("rapply:" + user.id, 6, 86400000)) throw httpError(429, "Too many tries today. Please try again tomorrow.");
+  const existing = getApp(user);
+  if (existing && existing.status !== "rejected") throw httpError(409, "You already have a request.");
+
+  const body = await readJson(req, 20000);
+  if (body.agree !== true) throw httpError(400, "Please read and agree to the recruiting terms.");
+  const app = { id: rid(), userId: user.id, role: body.role, status: "pending", created: Date.now(), note: "" };
+
+  if (body.role === "coach") {
+    app.fullName = need(body.fullName, 2, 60, "Your name");
+    if (!TEAMS.some(function (t) { return t.id === body.teamId; })) throw httpError(400, "Please choose your school.");
+    app.teamId = body.teamId;
+    app.title = need(body.title, 2, 60, "Your job title");
+    app.sports = (Array.isArray(body.sports) ? body.sports : []).filter(function (s) { return SPORTS[s]; });
+    if (app.sports.length === 0) throw httpError(400, "Choose at least one sport you recruit for.");
+    app.staffUrl = httpsUrl(body.staffUrl, null, "The staff page link");
+    if (!app.staffUrl) throw httpError(400, "The staff page link is required so we can verify you.");
+    app.schoolEmail = clean(body.schoolEmail, 100).toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.edu$/.test(app.schoolEmail)) throw httpError(400, "Please enter your school email (it must end in .edu).");
+  } else if (body.role === "player") {
+    app.fullName = need(body.fullName, 2, 60, "Your name");
+    const age = ageFrom(body.birthDate);
+    app.minor = age.age < 18;
+    app.birthYear = age.year;
+    app.level = body.level === "transfer" ? "transfer" : "highschool";
+    if (!SPORTS[body.sport]) throw httpError(400, "Please choose your sport.");
+    app.sport = body.sport;
+    app.gradYear = num(body.gradYear, 2026, 2032, "Class year", 0);
+    if (app.gradYear === null) throw httpError(400, "Class year is required.");
+    app.hsSchool = need(body.hsSchool, 2, 80, "Your school");
+    app.city = need(body.city, 2, 50, "Your city");
+    app.state = String(body.state || "").trim().toUpperCase();
+    if (!/^[A-Z]{2}$/.test(app.state)) throw httpError(400, "Use the two-letter state, like MS.");
+    app.refName = need(body.refName, 2, 60, "The coach or school contact's name");
+    app.refContact = need(body.refContact, 5, 120, "The coach or school contact's email or phone");
+    if (app.minor) {
+      const g = body.guardian || {};
+      app.guardian = {
+        name: need(g.name, 2, 60, "Parent or guardian name"),
+        relationship: need(g.relationship, 2, 30, "Relationship"),
+        email: clean(g.email, 100).toLowerCase(),
+        phone: need(g.phone, 7, 20, "Parent or guardian phone")
+      };
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(app.guardian.email)) throw httpError(400, "Please enter the parent or guardian's email.");
+      if (g.consent !== true) throw httpError(400, "A parent or guardian must agree before a player under 18 can join.");
+    }
+  } else {
+    throw httpError(400, "Choose player or coach.");
+  }
+
+  if (existing) rdb.apps = rdb.apps.filter(function (a) { return a !== existing; });
+  rdb.apps.push(app);
+  saveRdb();
+  sendJson(res, 200, { app: myApp(app) });
+}
+
+function recruitMe(res, user) {
+  const app = getApp(user);
+  const out = { username: user.username, app: app ? myApp(app) : null, admin: isAdmin(user) };
+  if (app && app.status === "approved") {
+    if (app.role === "player") {
+      const p = ensureProfile(app);
+      saveRdb();
+      out.profile = fullProfile(p, app);
+      out.positions = POSITIONS[p.sport];
+      out.measurables = MEASURABLES[p.sport];
+    }
+    out.unread = rdb.threads.reduce(function (sum, t) {
+      if (app.role === "coach" && t.coachId === user.id) return sum + (t.coachUnread || 0);
+      if (app.role === "player" && t.playerId === user.id) return sum + (t.playerUnread || 0);
+      return sum;
+    }, 0);
+  }
+  sendJson(res, 200, out);
+}
+
+// ----- Player profile -----
+async function saveProfile(req, res, user) {
+  const app = requireApproved(user, "player");
+  const p = ensureProfile(app);
+  const b = await readJson(req, 20000);
+
+  const position = clean(b.position, 4);
+  if (position && POSITIONS[p.sport].indexOf(position) === -1) throw httpError(400, "Choose a position from the list.");
+  const position2 = clean(b.position2, 4);
+  if (position2 && POSITIONS[p.sport].indexOf(position2) === -1) throw httpError(400, "Choose a second position from the list.");
+
+  const next = {
+    position: position, position2: position2,
+    height: num(b.height, 48, 96, "Height", 0), weight: num(b.weight, 80, 450, "Weight", 0),
+    club: clean(b.club, 60), gpa: num(b.gpa, 0, 4.5, "GPA", 2),
+    sat: num(b.sat, 400, 1600, "SAT", 0), act: num(b.act, 1, 36, "ACT", 0),
+    major: clean(b.major, 60), highlightUrl: httpsUrl(b.highlightUrl, VIDEO_HOSTS, "The highlight video link"),
+    bio: clean(b.bio, 600), committedTo: clean(b.committedTo, 60)
+  };
+  next.status = ["open", "committed", "signed"].indexOf(b.status) !== -1 ? b.status : "open";
+  if (next.status === "open") next.committedTo = "";
+
+  next.measurables = {};
+  const spec = MEASURABLES[p.sport];
+  Object.keys(spec).forEach(function (key) {
+    const v = num((b.measurables || {})[key], spec[key][0], spec[key][1], spec[key][2], 2);
+    if (v !== null) next.measurables[key] = v;
+  });
+
+  next.stats = (Array.isArray(b.stats) ? b.stats : []).slice(0, 6).map(function (row) {
+    return { season: clean(row && row.season, 20), line: clean(row && row.line, 140) };
+  }).filter(function (row) { return row.season || row.line; });
+
+  next.offers = (Array.isArray(b.offers) ? b.offers : []).slice(0, 8).map(function (o) {
+    const st = ["offer", "interest", "visit"].indexOf(o && o.status) !== -1 ? o.status : "interest";
+    return { school: clean(o && o.school, 60), status: st };
+  }).filter(function (o) { return o.school; });
+
+  [next.bio, next.club, next.major, next.committedTo].concat(
+    next.stats.map(function (r) { return r.season + " " + r.line; }),
+    next.offers.map(function (o) { return o.school; })
+  ).forEach(checkText);
+
+  next.allowMessages = b.allowMessages === true;
+  next.active = b.active === true;
+  if (next.active && (!next.position || !next.height || !next.weight)) {
+    throw httpError(400, "Add your position, height and weight before turning your profile on.");
+  }
+
+  Object.assign(p, next, { updated: Date.now() });
+  saveRdb();
+  sendJson(res, 200, { profile: fullProfile(p, app) });
+}
+
+// ----- Coach: search, view, board -----
+function coachPlayers(app) {
+  return rdb.profiles.filter(function (p) {
+    const pa = rdb.apps.find(function (a) { return a.userId === p.userId; });
+    return p.active && pa && pa.status === "approved" && app.sports.indexOf(p.sport) !== -1;
+  });
+}
+
+function searchPlayers(url, res, user) {
+  const app = requireApproved(user, "coach");
+  if (limited("rsearch:" + user.id, 150, 3600000)) throw httpError(429, "Too many searches. Please wait a bit.");
+  const q = url.searchParams;
+  const sport = q.get("sport") || "", year = q.get("year") || "", pos = q.get("pos") || "";
+  const state = (q.get("state") || "").toUpperCase(), status = q.get("status") || "";
+  const minGpa = parseFloat(q.get("minGpa") || ""), text = (q.get("q") || "").toLowerCase().trim();
+
+  let list = coachPlayers(app).filter(function (p) {
+    const pa = rdb.apps.find(function (a) { return a.userId === p.userId; });
+    if (sport && p.sport !== sport) return false;
+    if (year && String(p.gradYear) !== year) return false;
+    if (pos && p.position !== pos && p.position2 !== pos) return false;
+    if (state && p.state !== state) return false;
+    if (status && p.status !== status) return false;
+    if (isFinite(minGpa) && (p.gpa === null || p.gpa < minGpa)) return false;
+    if (text && (pa.fullName + " " + p.hsSchool + " " + p.city).toLowerCase().indexOf(text) === -1) return false;
+    return true;
+  });
+  list.sort(function (a, b) { return b.updated - a.updated; });
+  const total = list.length;
+  const out = list.slice(0, 60).map(function (p) {
+    return summaryOf(p, rdb.apps.find(function (a) { return a.userId === p.userId; }));
+  });
+  sendJson(res, 200, { players: out, total: total, board: app.board || [], sports: app.sports });
+}
+
+function viewPlayer(url, res, user) {
+  const app = requireApproved(user, "coach");
+  if (limited("rview:" + user.id, 300, 3600000)) throw httpError(429, "Too many profile views. Please wait a bit.");
+  const p = coachPlayers(app).find(function (x) { return x.id === url.searchParams.get("id"); });
+  if (!p) throw httpError(404, "That profile isn't available.");
+  const pa = rdb.apps.find(function (a) { return a.userId === p.userId; });
+  const thread = rdb.threads.find(function (t) { return t.coachId === user.id && t.playerId === p.userId; });
+  const out = fullProfile(p, pa);
+  out.onBoard = (app.board || []).indexOf(p.id) !== -1;
+  out.threadId = thread ? thread.id : "";
+  sendJson(res, 200, { profile: out });
+}
+
+async function boardToggle(req, res, user) {
+  const app = requireApproved(user, "coach");
+  const b = await readJson(req);
+  const p = coachPlayers(app).find(function (x) { return x.id === b.id; });
+  if (!p) throw httpError(404, "That profile isn't available.");
+  app.board = (app.board || []).filter(function (id) { return id !== p.id; });
+  if (b.on === true) app.board.push(p.id);
+  if (app.board.length > 200) throw httpError(400, "Your board is full.");
+  saveRdb();
+  sendJson(res, 200, { board: app.board });
+}
+
+function boardList(res, user) {
+  const app = requireApproved(user, "coach");
+  const list = coachPlayers(app).filter(function (p) { return (app.board || []).indexOf(p.id) !== -1; })
+    .map(function (p) { return summaryOf(p, rdb.apps.find(function (a) { return a.userId === p.userId; })); });
+  sendJson(res, 200, { players: list });
+}
+
+// ----- Messages -----
+function messageText(value) {
+  const text = clean(value, 1000);
+  if (!text) throw httpError(400, "Write a message first.");
+  const problem = filterProblem(text, false);
+  if (problem) throw httpError(400, problem + " (To protect players, contact details can't be shared here.)");
+  return text;
+}
+
+function addMessage(thread, from, text) {
+  const count = rdb.messages.filter(function (m) { return m.threadId === thread.id; }).length;
+  if (count >= MAX_THREAD_MESSAGES) throw httpError(400, "This conversation is full.");
+  rdb.messages.push({ id: rid(), threadId: thread.id, from: from, text: text, time: Date.now() });
+  thread.last = Date.now();
+  if (from === "coach") thread.playerUnread = (thread.playerUnread || 0) + 1;
+  else thread.coachUnread = (thread.coachUnread || 0) + 1;
+}
+
+async function startThread(req, res, user) {
+  const app = requireApproved(user, "coach");
+  if (limited("rthread:" + user.id, 20, 86400000)) throw httpError(429, "You've reached today's limit for new conversations.");
+  const b = await readJson(req);
+  const p = coachPlayers(app).find(function (x) { return x.id === b.playerId; });
+  if (!p) throw httpError(404, "That profile isn't available.");
+  if (!p.allowMessages) throw httpError(403, "This player isn't accepting messages right now.");
+  const text = messageText(b.text);
+  let thread = rdb.threads.find(function (t) { return t.coachId === user.id && t.playerId === p.userId; });
+  if (thread && thread.blocked) throw httpError(403, "This player isn't accepting messages from you.");
+  if (!thread) {
+    thread = { id: rid(), coachId: user.id, playerId: p.userId, teamId: app.teamId, created: Date.now(), last: Date.now(), blocked: false, coachUnread: 0, playerUnread: 0 };
+    rdb.threads.push(thread);
+  }
+  addMessage(thread, "coach", text);
+  saveRdb();
+  sendJson(res, 200, { threadId: thread.id });
+}
+
+function threadFor(user, id) {
+  const app = requireApproved(user);
+  const t = rdb.threads.find(function (x) { return x.id === id; });
+  if (!t || (t.coachId !== user.id && t.playerId !== user.id)) throw httpError(404, "Conversation not found.");
+  return { t: t, app: app };
+}
+
+function listThreads(res, user) {
+  const app = requireApproved(user);
+  const mine = rdb.threads.filter(function (t) { return app.role === "coach" ? t.coachId === user.id : t.playerId === user.id; });
+  mine.sort(function (a, b) { return b.last - a.last; });
+  const out = mine.map(function (t) {
+    const other = rdb.apps.find(function (a) { return a.userId === (app.role === "coach" ? t.playerId : t.coachId); });
+    const msgs = rdb.messages.filter(function (m) { return m.threadId === t.id; });
+    const last = msgs[msgs.length - 1];
+    return {
+      id: t.id, with: other ? other.fullName : "Removed account",
+      detail: other ? (other.role === "coach" ? other.title + ", " + teamOf(other) : SPORTS[other.sport] + " · Class of " + other.gradYear) : "",
+      preview: last ? last.text.slice(0, 80) : "", last: t.last, blocked: !!t.blocked,
+      unread: app.role === "coach" ? t.coachUnread || 0 : t.playerUnread || 0
+    };
+  });
+  sendJson(res, 200, { threads: out });
+}
+
+function getThread(url, res, user) {
+  const found = threadFor(user, url.searchParams.get("id"));
+  const t = found.t, role = found.app.role;
+  if (role === "coach") t.coachUnread = 0; else t.playerUnread = 0;
+  saveRdb();
+  const msgs = rdb.messages.filter(function (m) { return m.threadId === t.id; })
+    .map(function (m) { return { id: m.id, mine: m.from === role, text: m.text, time: m.time }; });
+  sendJson(res, 200, { id: t.id, blocked: !!t.blocked, messages: msgs });
+}
+
+async function sendMessage(req, res, user) {
+  if (limited("rmsg:" + user.id, 30, 600000)) throw httpError(429, "You're sending messages too fast.");
+  const b = await readJson(req);
+  const found = threadFor(user, b.threadId);
+  if (found.t.blocked) throw httpError(403, "This conversation is closed.");
+  if (found.app.role === "coach" && found.t.coachId === user.id) {
+    const p = rdb.profiles.find(function (x) { return x.userId === found.t.playerId; });
+    if (!p || !p.allowMessages || !p.active) throw httpError(403, "This player isn't accepting messages right now.");
+  }
+  addMessage(found.t, found.app.role, messageText(b.text));
+  saveRdb();
+  sendJson(res, 200, { ok: true });
+}
+
+async function blockThread(req, res, user) {
+  const b = await readJson(req);
+  const found = threadFor(user, b.threadId);
+  if (found.app.role !== "player") throw httpError(403, "Only players can block.");
+  found.t.blocked = b.on !== false;
+  saveRdb();
+  sendJson(res, 200, { ok: true });
+}
+
+async function reportThread(req, res, user) {
+  if (limited("rreport:" + user.id, 10, 86400000)) throw httpError(429, "Too many reports today.");
+  const b = await readJson(req);
+  const found = threadFor(user, b.threadId);
+  rdb.reports.push({ id: rid(), threadId: found.t.id, reporterId: user.id, reason: clean(b.reason, 300) || "No reason given", time: Date.now(), resolved: false });
+  saveRdb();
+  sendJson(res, 200, { ok: true });
+}
+
+// ----- Delete my recruiting data -----
+async function deleteMyRecruiting(req, res, user) {
+  const b = await readJson(req);
+  if (b.confirm !== "DELETE") throw httpError(400, "Type DELETE to confirm.");
+  const gone = rdb.threads.filter(function (t) { return t.coachId === user.id || t.playerId === user.id; })
+    .map(function (t) { return t.id; });
+  rdb.threads = rdb.threads.filter(function (t) { return gone.indexOf(t.id) === -1; });
+  rdb.messages = rdb.messages.filter(function (m) { return gone.indexOf(m.threadId) === -1; });
+  rdb.reports = rdb.reports.filter(function (r) { return gone.indexOf(r.threadId) === -1; });
+  rdb.profiles = rdb.profiles.filter(function (p) { return p.userId !== user.id; });
+  rdb.apps = rdb.apps.filter(function (a) { return a.userId !== user.id; });
+  saveRdb();
+  sendJson(res, 200, { ok: true });
+}
+
+// ----- Admin review -----
+function adminRecruit(res) {
+  function who(a) {
+    const u = db.users.find(function (x) { return x.id === a.userId; });
+    return u ? u.username : "(removed)";
+  }
+  function full(a) {
+    return Object.assign({}, a, { username: who(a), teamName: teamOf(a), userId: undefined });
+  }
+  const reports = rdb.reports.filter(function (r) { return !r.resolved; }).map(function (r) {
+    const t = rdb.threads.find(function (x) { return x.id === r.threadId; });
+    const coach = t && rdb.apps.find(function (a) { return a.userId === t.coachId; });
+    const player = t && rdb.apps.find(function (a) { return a.userId === t.playerId; });
+    return {
+      id: r.id, reason: r.reason, time: r.time, coachId: coach ? coach.id : "", coachName: coach ? coach.fullName : "?",
+      coachTeam: coach ? teamOf(coach) : "", playerName: player ? player.fullName : "?",
+      playerMinor: !!(player && player.minor),
+      messages: rdb.messages.filter(function (m) { return t && m.threadId === t.id; })
+        .map(function (m) { return { from: m.from, text: m.text, time: m.time }; })
+    };
+  });
+  sendJson(res, 200, {
+    pending: rdb.apps.filter(function (a) { return a.status === "pending"; }).map(full),
+    approved: rdb.apps.filter(function (a) { return a.status === "approved"; }).map(function (a) {
+      return { id: a.id, role: a.role, fullName: a.fullName, username: who(a), status: a.status, teamName: teamOf(a), sport: a.sport || (a.sports || []).join(", "), minor: !!a.minor };
+    }),
+    suspended: rdb.apps.filter(function (a) { return a.status === "suspended" || a.status === "rejected"; }).map(function (a) {
+      return { id: a.id, role: a.role, fullName: a.fullName, username: who(a), status: a.status, teamName: teamOf(a) };
+    }),
+    reports: reports
+  });
+}
+
+async function adminRecruitAction(req, res, action) {
+  const b = await readJson(req);
+  if (action === "dismiss-report") {
+    const r = rdb.reports.find(function (x) { return x.id === b.id; });
+    if (!r) throw httpError(404, "Report not found.");
+    r.resolved = true;
+    saveRdb();
+    return sendJson(res, 200, { ok: true });
+  }
+  const app = appById(b.id);
+  if (!app) throw httpError(404, "Request not found.");
+  if (action === "approve") {
+    app.status = "approved";
+    app.note = "";
+    if (app.role === "player") ensureProfile(app);
+  } else if (action === "reject") {
+    app.status = "rejected";
+    app.note = clean(b.note, 200);
+  } else if (action === "suspend") {
+    app.status = "suspended";
+    rdb.profiles.forEach(function (p) { if (p.userId === app.userId) p.active = false; });
+  } else if (action === "restore") {
+    app.status = "approved";
+  } else {
+    throw httpError(404, "Not found.");
+  }
+  app.reviewed = Date.now();
+  saveRdb();
+  sendJson(res, 200, { ok: true });
+}
+
+async function handleRecruit(req, res, url) {
+  if (req.method === "POST" && !sameOrigin(req)) throw httpError(403, "Blocked request.");
+  const user = requireUser(currentUser(req));
+  const route = req.method + " " + url.pathname;
+
+  switch (route) {
+    case "GET /recruit/me": return recruitMe(res, user);
+    case "POST /recruit/apply": return recruitApply(req, res, user);
+    case "POST /recruit/profile": return saveProfile(req, res, user);
+    case "GET /recruit/players": return searchPlayers(url, res, user);
+    case "GET /recruit/player": return viewPlayer(url, res, user);
+    case "POST /recruit/board": return boardToggle(req, res, user);
+    case "GET /recruit/board": return boardList(res, user);
+    case "POST /recruit/start": return startThread(req, res, user);
+    case "GET /recruit/threads": return listThreads(res, user);
+    case "GET /recruit/thread": return getThread(url, res, user);
+    case "POST /recruit/send": return sendMessage(req, res, user);
+    case "POST /recruit/block": return blockThread(req, res, user);
+    case "POST /recruit/report": return reportThread(req, res, user);
+    case "POST /recruit/delete-my-data": return deleteMyRecruiting(req, res, user);
+    case "GET /recruit/admin/overview":
+      requireAdmin(user);
+      return adminRecruit(res);
+  }
+  if (req.method === "POST" && url.pathname.indexOf("/recruit/admin/") === 0) {
+    requireAdmin(user);
+    return adminRecruitAction(req, res, url.pathname.slice("/recruit/admin/".length));
+  }
+  throw httpError(404, "Not found.");
+}
+
+// ---------------------------------------------------------------------
 //  Web pages
 // ---------------------------------------------------------------------
 const TEAMS_BUTTON = '<button class="view-btn" data-view="teams">Teams</button>';
@@ -730,6 +1309,12 @@ const server = http.createServer(async function (req, res) {
     // Fan Talk
     if (pathname.startsWith("/fan/")) {
       await handleFan(req, res, url);
+      return;
+    }
+
+    // Recruiting (locked area)
+    if (pathname.startsWith("/recruit/")) {
+      await handleRecruit(req, res, url);
       return;
     }
 
@@ -779,6 +1364,7 @@ const server = http.createServer(async function (req, res) {
 
     const EXTRA_PAGES = {
       "/admin": "admin.html", "/admin.html": "admin.html",
+      "/recruiting": "recruiting.html", "/recruiting.html": "recruiting.html",
       "/rules": "rules.html", "/rules.html": "rules.html",
       "/privacy": "privacy.html", "/privacy.html": "privacy.html"
     };
@@ -801,5 +1387,6 @@ const server = http.createServer(async function (req, res) {
 server.listen(PORT, function () {
   console.log("Site running at http://localhost:" + PORT);
   console.log("Fan Talk at   http://localhost:" + PORT + "/fan-talk");
+  console.log("Recruiting at http://localhost:" + PORT + "/recruiting");
   if (ADMIN_USERS.length === 0) console.log("Tip: set ADMIN_USERS=yourusername to use /admin");
 });
