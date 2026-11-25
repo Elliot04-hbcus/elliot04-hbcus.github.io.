@@ -1216,6 +1216,37 @@ function adminRecruit(res) {
   });
 }
 
+// Read-only list of every player profile and coach account (admins only)
+function adminDirectory(res) {
+  function uname(a) {
+    const u = db.users.find(function (x) { return x.id === a.userId; });
+    return u ? u.username : "(removed)";
+  }
+  const players = [], coaches = [];
+  rdb.apps.forEach(function (a) {
+    if (a.role === "coach") {
+      coaches.push({
+        id: a.id, status: a.status, username: uname(a), fullName: a.fullName, teamName: teamOf(a), title: a.title,
+        sports: a.sports || [], staffUrl: a.staffUrl, schoolEmail: a.schoolEmail, created: a.created
+      });
+    } else if (a.role === "player") {
+      const p = rdb.profiles.find(function (x) { return x.userId === a.userId; }) || null;
+      players.push({
+        id: a.id, status: a.status, username: uname(a), fullName: a.fullName, minor: !!a.minor, birthYear: a.birthYear,
+        level: a.level, sport: a.sport, gradYear: a.gradYear, hsSchool: a.hsSchool, city: a.city, state: a.state,
+        guardian: a.guardian || null, created: a.created,
+        profile: p ? {
+          active: !!p.active, allowMessages: !!p.allowMessages, position: p.position, position2: p.position2,
+          height: p.height, weight: p.weight, club: p.club, gpa: p.gpa, sat: p.sat, act: p.act, major: p.major,
+          measurables: p.measurables || {}, stats: p.stats || [], highlightUrl: p.highlightUrl, bio: p.bio,
+          committedTo: p.committedTo, offers: p.offers || [], complete: completeness(p), updated: p.updated
+        } : null
+      });
+    }
+  });
+  sendJson(res, 200, { players: players, coaches: coaches });
+}
+
 async function adminRecruitAction(req, res, action) {
   const b = await readJson(req);
   if (action === "dismiss-report") {
@@ -1270,6 +1301,9 @@ async function handleRecruit(req, res, url) {
     case "GET /recruit/admin/overview":
       requireAdmin(user);
       return adminRecruit(res);
+    case "GET /recruit/admin/directory":
+      requireAdmin(user);
+      return adminDirectory(res);
   }
   if (req.method === "POST" && url.pathname.indexOf("/recruit/admin/") === 0) {
     requireAdmin(user);
