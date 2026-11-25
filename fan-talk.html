@@ -239,6 +239,7 @@ label.field input {
 .recovery { border: 2px dashed var(--accent); border-radius: 8px; padding: 1rem; margin: 0.8rem 0; background: var(--card2); }
 .recovery code { display: block; font-size: 1.25rem; letter-spacing: 0.06em; margin: 0.5rem 0; word-break: break-all; font-weight: 800; }
 .btn-row { display: flex; gap: 0.6rem; flex-wrap: wrap; }
+.attention { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
 .block-list { list-style: none; margin-top: 0.6rem; }
 .block-list li { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; padding: 0.2rem 0; font-size: 0.9rem; }
 .mini-btn { background: none; border: none; color: var(--accent); text-decoration: underline; font-size: 0.8rem; min-height: 36px; }
@@ -316,7 +317,7 @@ label.field input {
     </div>
 
     <form id="login-form" autocomplete="on">
-      <label class="field">Username
+      <label class="field">Username or email
         <input id="login-username" type="text" autocomplete="username" autocapitalize="none" required>
       </label>
       <label class="field">Password
@@ -329,6 +330,10 @@ label.field input {
       <label class="field">Choose a username
         <input id="signup-username" type="text" autocomplete="username" autocapitalize="none" maxlength="20" required>
         <span class="muted">3 to 20 characters: letters, numbers, underscores.</span>
+      </label>
+      <label class="field" id="signup-email-row" hidden>Email
+        <input id="signup-email" type="email" autocomplete="email" maxlength="120">
+        <span class="muted">We email you a code to confirm it. It's private, never shown in chat, and lets you reset your password.</span>
       </label>
       <label class="field">Choose a password
         <input id="signup-password" type="password" autocomplete="new-password" minlength="8" required>
@@ -616,6 +621,7 @@ async function submitSignup(event) {
 
   var result = await api("/fan/signup", {
     username: $("signup-username").value,
+    email: $("signup-email").value,
     password: $("signup-password").value,
     ageOk: $("signup-age").checked
   });
@@ -691,13 +697,15 @@ function renderEmail(message) {
   var html = "";
   if (u.email) {
     html = '<p>Your confirmed email is <strong>' + esc2(u.email) + '</strong>. You can use it to get a reset code if you forget your password. Nobody in chat can see it.</p>' +
+      (app.user.emailRequired ? "" :
       '<label class="field">To remove it, type your password<input id="email-pass" type="password" autocomplete="current-password"></label>' +
-      '<button class="btn btn-plain" id="email-remove" type="button">Remove email</button>';
+      '<button class="btn btn-plain" id="email-remove" type="button">Remove email</button>');
   } else if (u.emailPending) {
     html = '<p>We sent a code to <strong>' + esc2(u.emailPending) + '</strong>. It can take a minute. Check spam too. If that address can\'t be used, no code is sent.</p>' +
       '<label class="field">Code<input id="email-code" type="text" autocomplete="off" autocapitalize="characters"></label>' +
       '<div class="btn-row"><button class="btn" id="email-confirm" type="button">Confirm email</button>' +
-      '<button class="btn btn-plain" id="email-cancel" type="button">Use a different email</button></div>';
+      '<button class="btn btn-plain" id="email-resend" type="button">Send a new code</button>' +
+      (u.needsEmail ? "" : '<button class="btn btn-plain" id="email-cancel" type="button">Use a different email</button>') + '</div>';
   } else {
     html = '<p class="muted">Optional. Add an email so you can reset your password by email if you lose your recovery code. It is private and never shown in chat.</p>' +
       '<label class="field">Email<input id="email-input" type="email" maxlength="120" autocomplete="email"></label>' +
@@ -706,6 +714,8 @@ function renderEmail(message) {
   html += '<p id="email-msg" class="muted" role="status" style="margin-top:0.5rem">' + esc2(message || "") + '</p>';
   $("email-body").innerHTML = html;
   $("email-details").open = !!(message || u.emailPending);
+  $("email-card").classList.toggle("attention", !!u.needsEmail);
+  if (u.needsEmail && !message) $("email-msg").textContent = "Confirm your email to start posting.";
 }
 
 async function emailAction(path, body, okMessage) {
@@ -719,6 +729,7 @@ function wireEmail() {
     var id = event.target.id;
     if (id === "email-start") emailAction("/fan/email/start", { email: $("email-input").value }, "");
     else if (id === "email-confirm") emailAction("/fan/email/confirm", { code: $("email-code").value }, "Email confirmed.");
+    else if (id === "email-resend") emailAction("/fan/email/start", { email: app.user.emailPending }, "A new code is on its way.");
     else if (id === "email-cancel") emailAction("/fan/email/remove", { cancel: true }, "");
     else if (id === "email-remove") emailAction("/fan/email/remove", { password: $("email-pass").value }, "Email removed.");
   });
@@ -1132,6 +1143,8 @@ async function init() {
     $("contact-line").textContent = "Contact: " + config.data.contact;
   }
   var mailOn = !!(config.ok && config.data.mail);
+  $("signup-email-row").hidden = !mailOn;
+  $("signup-email").required = mailOn;
   $("email-card").hidden = !mailOn;
   $("recover-send-row").hidden = !mailOn;
   $("recover-mail-help").hidden = !mailOn;
