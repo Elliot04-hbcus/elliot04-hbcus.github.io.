@@ -267,6 +267,7 @@ label.field input {
   .room-picker .room-select { margin-top: 0; }
 
   .chat-card {
+    min-width: 0; max-width: 100%;
     display: flex; flex-direction: column; padding: 0.8rem;
     height: max(440px, calc(100vh - 330px));
     height: max(440px, calc(100dvh - 330px));
@@ -343,11 +344,12 @@ label.field input {
     </form>
 
     <form id="recover-form" autocomplete="off" hidden>
-      <p class="muted" style="margin-bottom:0.8rem">Enter the recovery code you were shown when you created your account.</p>
-      <label class="field">Username
+      <p class="muted" style="margin-bottom:0.8rem">Enter the recovery code you were shown when you created your account.<span id="recover-mail-help"> If you added an email to your account, you can tap <strong>Email me a code</strong> instead.</span></p>
+      <label class="field">Username or email
         <input id="recover-username" type="text" autocomplete="username" autocapitalize="none" required>
       </label>
-      <label class="field">Recovery code
+      <p id="recover-send-row" style="margin-bottom:0.6rem"><button id="recover-send" class="btn btn-plain" type="button">Email me a code</button> <span id="recover-info" class="muted"></span></p>
+      <label class="field">Recovery code or emailed code
         <input id="recover-code" type="text" autocomplete="off" autocapitalize="characters" required>
       </label>
       <label class="field">New password
@@ -363,6 +365,7 @@ label.field input {
   <section id="recovery-view" class="auth-card card" hidden>
     <h2>Save your recovery code</h2>
     <p>This is the only way back in if you forget your password, and it can't be shown again. Write it down or save it somewhere safe.</p>
+    <p class="muted" id="recovery-mail-tip">Tip: once you're in, add an email under "Email for password resets" to get reset codes by email too.</p>
     <div class="recovery"><code id="recovery-code"></code></div>
     <div class="btn-row">
       <button id="recovery-copy" class="btn btn-plain" type="button">Copy code</button>
@@ -396,6 +399,13 @@ label.field input {
           </div>
         </details>
         <p id="fav-summary" class="muted" style="margin-top:0.6rem"></p>
+      </div>
+
+      <div class="card" id="email-card" hidden>
+        <details id="email-details">
+          <summary style="cursor:pointer;font-weight:700;font-size:0.85rem;text-transform:uppercase;min-height:28px">Email for password resets</summary>
+          <div id="email-body" style="margin-top:0.6rem"></div>
+        </details>
       </div>
 
       <div class="card">
@@ -625,6 +635,15 @@ function showRecovery(user, code) {
   showView("recovery");
 }
 
+async function sendRecoverEmail() {
+  $("auth-error").textContent = ""; $("recover-info").textContent = "";
+  var who = $("recover-username").value.trim();
+  if (!who) { $("auth-error").textContent = "Type your username or email first."; return; }
+  var r = await api("/fan/forgot", { username: who });
+  if (r.ok) $("recover-info").textContent = "If that account has a confirmed email, a code is on its way. Check spam too.";
+  else $("auth-error").textContent = r.data.error || "Could not send the email.";
+}
+
 async function submitRecover(event) {
   event.preventDefault();
   $("auth-error").textContent = "";
@@ -660,6 +679,49 @@ function copyRecovery() {
   } else {
     note("Copy it by hand");
   }
+}
+
+/* ---------- 3a. EMAIL FOR PASSWORD RESETS (optional) ---------- */
+function esc2(text) {
+  return String(text == null ? "" : text).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+function renderEmail(message) {
+  var u = app.user;
+  var html = "";
+  if (u.email) {
+    html = '<p>Your confirmed email is <strong>' + esc2(u.email) + '</strong>. You can use it to get a reset code if you forget your password. Nobody in chat can see it.</p>' +
+      '<label class="field">To remove it, type your password<input id="email-pass" type="password" autocomplete="current-password"></label>' +
+      '<button class="btn btn-plain" id="email-remove" type="button">Remove email</button>';
+  } else if (u.emailPending) {
+    html = '<p>We sent a code to <strong>' + esc2(u.emailPending) + '</strong>. It can take a minute. Check spam too. If that address can\'t be used, no code is sent.</p>' +
+      '<label class="field">Code<input id="email-code" type="text" autocomplete="off" autocapitalize="characters"></label>' +
+      '<div class="btn-row"><button class="btn" id="email-confirm" type="button">Confirm email</button>' +
+      '<button class="btn btn-plain" id="email-cancel" type="button">Use a different email</button></div>';
+  } else {
+    html = '<p class="muted">Optional. Add an email so you can reset your password by email if you lose your recovery code. It is private and never shown in chat.</p>' +
+      '<label class="field">Email<input id="email-input" type="email" maxlength="120" autocomplete="email"></label>' +
+      '<button class="btn" id="email-start" type="button">Send confirmation code</button>';
+  }
+  html += '<p id="email-msg" class="muted" role="status" style="margin-top:0.5rem">' + esc2(message || "") + '</p>';
+  $("email-body").innerHTML = html;
+  $("email-details").open = !!(message || u.emailPending);
+}
+
+async function emailAction(path, body, okMessage) {
+  var r = await api(path, body);
+  if (r.ok && r.data.user) { app.user = r.data.user; renderEmail(okMessage); }
+  else if ($("email-msg")) $("email-msg").textContent = r.data.error || "That didn't work.";
+}
+
+function wireEmail() {
+  $("email-body").addEventListener("click", function (event) {
+    var id = event.target.id;
+    if (id === "email-start") emailAction("/fan/email/start", { email: $("email-input").value }, "");
+    else if (id === "email-confirm") emailAction("/fan/email/confirm", { code: $("email-code").value }, "Email confirmed.");
+    else if (id === "email-cancel") emailAction("/fan/email/remove", { cancel: true }, "");
+    else if (id === "email-remove") emailAction("/fan/email/remove", { password: $("email-pass").value }, "Email removed.");
+  });
 }
 
 /* ---------- 3b. BLOCKED USERS ---------- */
@@ -962,6 +1024,7 @@ function enterChat(user) {
   $("who").textContent = user.username;
   $("admin-link").hidden = !user.admin;
   showView("chat");
+  renderEmail("");
   renderBlocked();
   buildFavorites();
   app.room = "general";
@@ -992,6 +1055,8 @@ function bindEvents() {
     if (button) setBlocked(button.dataset.unblock, false);
   });
   $("logout").addEventListener("click", doLogout);
+  wireEmail();
+  $("recover-send").addEventListener("click", sendRecoverEmail);
 
   $("fav-save").addEventListener("click", saveFavorites);
   $("fav-list").addEventListener("change", function (event) {
@@ -1066,6 +1131,11 @@ async function init() {
   if (config.ok && config.data.contact) {
     $("contact-line").textContent = "Contact: " + config.data.contact;
   }
+  var mailOn = !!(config.ok && config.data.mail);
+  $("email-card").hidden = !mailOn;
+  $("recover-send-row").hidden = !mailOn;
+  $("recover-mail-help").hidden = !mailOn;
+  $("recovery-mail-tip").hidden = !mailOn;
 
   var me = await api("/fan/me");
   if (me.ok && me.data.user) enterChat(me.data.user);
