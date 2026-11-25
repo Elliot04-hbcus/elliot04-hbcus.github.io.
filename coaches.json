@@ -1,0 +1,23 @@
+{
+  "_how": "Add each coach as {\"name\": \"First Last\", \"title\": \"Position\"}. A team with an empty list shows whatever the data feed has.",
+  "football": {
+    "Alabama A&M": [],
+    "Alabama State": [],
+    "Alcorn State": [],
+    "Arkansas-Pine Bluff": [],
+    "Bethune-Cookman": [],
+    "Florida A&M": [],
+    "Grambling State": [],
+    "Jackson State": [],
+    "Mississippi Valley State": [],
+    "Prairie View A&M": [],
+    "Southern": [],
+    "Texas Southern": [],
+    "Delaware State": [],
+    "Howard": [],
+    "Morgan State": [],
+    "Norfolk State": [],
+    "North Carolina Central": [],
+    "South Carolina State": []
+  }
+}
