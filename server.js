@@ -1355,6 +1355,23 @@ async function sendImage(req, res) {
   send(res, 200, type, body, cacheHeaders);
 }
 
+// ----- Coaching staffs typed in by hand (coaches.json) -----
+let staffCache = { time: 0, body: "{}" };
+function sendStaff(res) {
+  if (Date.now() - staffCache.time > 30000) {
+    let body = "{}";
+    try {
+      const text = fs.readFileSync(path.join(__dirname, "coaches.json"), "utf8");
+      JSON.parse(text);
+      body = text;
+    } catch (error) {
+      body = "{}";
+    }
+    staffCache = { time: Date.now(), body: body };
+  }
+  send(res, 200, "application/json", staffCache.body, { "Cache-Control": "public, max-age=300" });
+}
+
 // ---------------------------------------------------------------------
 //  Web pages
 // ---------------------------------------------------------------------
@@ -1392,6 +1409,12 @@ const server = http.createServer(async function (req, res) {
     // Recruiting (locked area)
     if (pathname.startsWith("/recruit/")) {
       await handleRecruit(req, res, url);
+      return;
+    }
+
+    // Hand-entered coaching staffs (optional coaches.json next to server.js)
+    if (pathname === "/api/staff") {
+      sendStaff(res);
       return;
     }
 
