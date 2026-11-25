@@ -11,6 +11,7 @@
 //    ALLOW_LINKS=1             allow links in chat
 //    BANNED_WORDS_FILE         word list (default: banned-words.txt)
 //    UPSTREAM_SITE, UPSTREAM_ATHLETE   where game data comes from
+//    UPSTREAM_IMG              where team logos and player photos come from
 // =====================================================================
 
 const http = require("http");
@@ -1312,6 +1313,48 @@ async function handleRecruit(req, res, url) {
   throw httpError(404, "Not found.");
 }
 
+// ----- Team logos and player photos -----
+// The page asks for /api/img/<path>. Only logo and headshot folders are allowed,
+// so this can't be used to fetch anything else. Images are remembered for a day.
+const IMG_HOST = process.env.UPSTREAM_IMG || "https://a.espncdn.com";
+const IMG_OK = /^(i\/(teamlogos|headshots)\/[A-Za-z0-9_\/.\-]+\.(png|jpe?g|gif|webp)|combiner\/i\?img=(\/|%2F)i(\/|%2F)(teamlogos|headshots)(\/|%2F)[A-Za-z0-9_\/.\-%]+\.(png|jpe?g|gif|webp)(&[A-Za-z0-9=&_.\-]*)?)$/;
+const imgCache = {};
+let imgCacheCount = 0;
+
+async function sendImage(req, res) {
+  if (req.method !== "GET") throw httpError(405, "Not allowed.");
+  const rest = req.url.slice("/api/img/".length);
+  if (rest.length > 300 || rest.indexOf("..") !== -1 || !IMG_OK.test(rest)) throw httpError(404, "Not found.");
+  const cacheHeaders = { "Cache-Control": "public, max-age=86400" };
+
+  const hit = imgCache[rest];
+  if (hit && Date.now() - hit.time < 86400000) {
+    send(res, 200, hit.type, hit.body, cacheHeaders);
+    return;
+  }
+
+  let upstream;
+  try {
+    upstream = await fetch(IMG_HOST + "/" + rest);
+  } catch (error) {
+    throw httpError(502, "Image unavailable.");
+  }
+  const type = (upstream.headers.get("content-type") || "").split(";")[0].trim().toLowerCase();
+  if (!upstream.ok || ["image/png", "image/jpeg", "image/gif", "image/webp"].indexOf(type) === -1) {
+    throw httpError(404, "Not found.");
+  }
+  const body = Buffer.from(await upstream.arrayBuffer());
+  if (body.length > 1000000) throw httpError(404, "Not found.");
+
+  if (imgCacheCount >= 400) {
+    for (const k in imgCache) delete imgCache[k];
+    imgCacheCount = 0;
+  }
+  imgCache[rest] = { time: Date.now(), type: type, body: body };
+  imgCacheCount++;
+  send(res, 200, type, body, cacheHeaders);
+}
+
 // ---------------------------------------------------------------------
 //  Web pages
 // ---------------------------------------------------------------------
@@ -1349,6 +1392,12 @@ const server = http.createServer(async function (req, res) {
     // Recruiting (locked area)
     if (pathname.startsWith("/recruit/")) {
       await handleRecruit(req, res, url);
+      return;
+    }
+
+    // Team logos and player photos (only a fixed set of image folders is allowed)
+    if (pathname.startsWith("/api/img/")) {
+      await sendImage(req, res);
       return;
     }
 
