@@ -287,7 +287,10 @@ function publicUser(user) {
     const u = db.users.find(function (x) { return x.id === id; });
     return u ? u.username : "";
   }).filter(Boolean);
-  return { username: user.username, favorites: user.favorites, blocked: blocked, admin: isAdmin(user) };
+  return {
+    username: user.username, favorites: user.favorites, blocked: blocked, admin: isAdmin(user),
+    email: user.emailVerified ? user.email : "", emailPending: user.pendingEmail || ""
+  };
 }
 
 function requireAdmin(user) {
@@ -386,11 +389,16 @@ async function recover(req, res, ip) {
     throw httpError(400, "Passwords must be 8 to 100 characters.");
   }
 
-  const user = db.users.find(function (u) { return u.usernameLower === lower; });
+  if (limited("recover-id:" + lower, 10, 900000)) {
+    throw httpError(429, "Too many attempts for this account. Please wait 15 minutes.");
+  }
+  const user = findFanUser(lower);
   const attempt = await scrypt(code, user && user.recSalt ? user.recSalt : "00000000000000000000000000000000", 64);
-  const ok = user && user.recHash && crypto.timingSafeEqual(attempt, Buffer.from(user.recHash, "hex"));
-  if (!ok) throw httpError(401, "That username and recovery code don't match.");
+  let ok = user && user.recHash && crypto.timingSafeEqual(attempt, Buffer.from(user.recHash, "hex"));
+  if (!ok && user) ok = fanResetCodeOk(user, code);
+  if (!ok) throw httpError(401, "That username or email and code don't match.");
   if (user.banned) throw httpError(403, "This account has been suspended.");
+  fanClearReset(user);
 
   user.salt = crypto.randomBytes(16).toString("hex");
   user.hash = (await scrypt(password, user.salt, 64)).toString("hex");
@@ -682,9 +690,17 @@ async function handleFan(req, res, url) {
     case "POST /fan/report":
       return reportMessage(req, res, requireUser(user));
     case "GET /fan/config":
-      return sendJson(res, 200, { contact: CONTACT_EMAIL });
+      return sendJson(res, 200, { contact: CONTACT_EMAIL, mail: mailReady });
     case "POST /fan/recover":
       return recover(req, res, ip);
+    case "POST /fan/forgot":
+      return fanForgot(req, res);
+    case "POST /fan/email/start":
+      return fanEmailStart(req, res, requireUser(user));
+    case "POST /fan/email/confirm":
+      return fanEmailConfirm(req, res, requireUser(user));
+    case "POST /fan/email/remove":
+      return fanEmailRemove(req, res, requireUser(user));
     case "POST /fan/block":
       return blockUser(req, res, requireUser(user), true);
     case "POST /fan/unblock":
@@ -833,6 +849,113 @@ async function sendMail(to, subject, text) {
 
 function emailFooter() {
   return "\n\n" + (SITE_URL ? "Open the Recruiting page: " + SITE_URL + "/recruiting\n" : "") + "HBCU Surge";
+}
+
+// ----- Fan Talk: optional email for password resets -----
+// The email only counts once the owner types back a code we sent to it.
+function shortCode() {
+  const letters = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+  const bytes = crypto.randomBytes(8);
+  let code = "";
+  for (let i = 0; i < 8; i++) code += letters[bytes[i] % letters.length];
+  return code;
+}
+
+function sameHash(a, b) {
+  return typeof a === "string" && typeof b === "string" && a.length === b.length && crypto.timingSafeEqual(Buffer.from(a), Buffer.from(b));
+}
+
+// Used by sign-in recovery: a username, or a confirmed email address
+function findFanUser(identifier) {
+  const id = String(identifier || "").trim().toLowerCase();
+  if (id.indexOf("@") !== -1) {
+    return db.users.find(function (u) { return u.emailVerified && u.email === id; });
+  }
+  return db.users.find(function (u) { return u.usernameLower === id; });
+}
+
+// True when the code is a valid emailed reset code for this account
+function fanResetCodeOk(user, code) {
+  if (!user || !user.resetHash || !(user.resetExp > Date.now())) return false;
+  return sameHash(sha256(user.resetSalt + code), user.resetHash);
+}
+
+function fanClearReset(user) {
+  user.resetHash = ""; user.resetSalt = ""; user.resetExp = 0;
+}
+
+async function fanEmailStart(req, res, user) {
+  if (!mailReady) throw httpError(503, "Email isn't set up on this site yet.");
+  if (limited("femail:" + user.id, 5, 3600000)) throw httpError(429, "Too many tries. Please try again in an hour.");
+  const b = await readJson(req);
+  const email = cleanEmail(b.email);
+  const taken = db.users.some(function (u) { return u.id !== user.id && u.emailVerified && u.email === email; });
+  user.pendingEmail = email;
+  user.pendingSalt = crypto.randomBytes(8).toString("hex");
+  const code = shortCode();
+  user.pendingHash = sha256(user.pendingSalt + code);
+  user.pendingExp = Date.now() + 30 * 60000;
+  saveDb();
+  // Same answer either way, so this can't be used to find out who uses which email
+  if (!taken && !limited("femail-e:" + email, 3, 3600000)) {
+    await sendMail(email, "Confirm your email for HBCU Surge Fan Talk",
+      "Your code to confirm this email on Fan Talk is:\n\n    " + code + "\n\nIt works for 30 minutes. Enter it in your Fan Talk account.\n\nIf you didn't ask for this, ignore this email." + emailFooter().replace("/recruiting", "/fan-talk").replace("Recruiting page", "Fan Talk page"));
+  }
+  sendJson(res, 200, { ok: true, user: publicUser(user) });
+}
+
+async function fanEmailConfirm(req, res, user) {
+  if (limited("fconfirm:" + user.id, 10, 900000)) throw httpError(429, "Too many tries. Please wait 15 minutes.");
+  const b = await readJson(req);
+  const code = String(b.code || "").replace(/[^A-Za-z0-9]/g, "").toUpperCase();
+  if (!user.pendingEmail || !(user.pendingExp > Date.now()) || !sameHash(sha256(user.pendingSalt + code), user.pendingHash)) {
+    throw httpError(400, "That code isn't right, or it has expired. Ask for a new one.");
+  }
+  if (db.users.some(function (u) { return u.id !== user.id && u.emailVerified && u.email === user.pendingEmail; })) {
+    throw httpError(400, "That email can't be used. Try another.");
+  }
+  user.email = user.pendingEmail;
+  user.emailVerified = true;
+  user.pendingEmail = ""; user.pendingHash = ""; user.pendingSalt = ""; user.pendingExp = 0;
+  saveDb();
+  sendJson(res, 200, { ok: true, user: publicUser(user) });
+}
+
+async function fanEmailRemove(req, res, user) {
+  const b = await readJson(req);
+  if (b.cancel === true) {
+    user.pendingEmail = ""; user.pendingHash = ""; user.pendingSalt = ""; user.pendingExp = 0;
+    saveDb();
+    return sendJson(res, 200, { ok: true, user: publicUser(user) });
+  }
+  const attempt = await scrypt(String(b.password || ""), user.salt, 64);
+  if (!crypto.timingSafeEqual(attempt, Buffer.from(user.hash, "hex"))) throw httpError(401, "That password isn't right.");
+  user.email = ""; user.emailVerified = false;
+  user.pendingEmail = ""; user.pendingHash = ""; user.pendingSalt = ""; user.pendingExp = 0;
+  fanClearReset(user);
+  saveDb();
+  sendJson(res, 200, { ok: true, user: publicUser(user) });
+}
+
+// "Email me a code" on the Fan Talk forgot-password form. Always answers the same way.
+async function fanForgot(req, res) {
+  const ip = clientIp(req);
+  if (limited("ffg:" + ip, 5, 3600000)) throw httpError(429, "Too many requests. Please try again in an hour.");
+  if (!mailReady) throw httpError(503, "Email isn't set up on this site yet. Use your recovery code instead.");
+  const b = await readJson(req);
+  const id = String(b.username || "").trim().toLowerCase();
+  if (!id || limited("ffg-e:" + id, 3, 3600000)) return sendJson(res, 200, { ok: true });
+  const user = findFanUser(id);
+  if (user && user.emailVerified && !user.banned) {
+    const code = shortCode();
+    user.resetSalt = crypto.randomBytes(8).toString("hex");
+    user.resetHash = sha256(user.resetSalt + code);
+    user.resetExp = Date.now() + 30 * 60000;
+    saveDb();
+    await sendMail(user.email, "Your HBCU Surge Fan Talk reset code",
+      "Your code to reset your Fan Talk password is:\n\n    " + code + "\n\nIt works for 30 minutes. Enter it on the Fan Talk page where it asks for a recovery code.\n\nIf you didn't ask for this, ignore this email. Your password has not changed." + emailFooter().replace("/recruiting", "/fan-talk").replace("Recruiting page", "Fan Talk page"));
+  }
+  sendJson(res, 200, { ok: true });
 }
 
 // ----- Recruiting accounts (separate from Fan Talk) -----
