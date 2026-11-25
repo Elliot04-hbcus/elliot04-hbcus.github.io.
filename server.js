@@ -12,6 +12,8 @@
 //    BANNED_WORDS_FILE         word list (default: banned-words.txt)
 //    UPSTREAM_SITE, UPSTREAM_ATHLETE   where game data comes from
 //    UPSTREAM_IMG              where team logos and player photos come from
+//    MAIL_API_KEY, MAIL_FROM   Brevo email (reset codes, approval notices, alerts)
+//    SITE_URL, ADMIN_NOTIFY    optional: your site address; who gets new-request alerts (default CONTACT_EMAIL)
 // =====================================================================
 
 const http = require("http");
@@ -801,6 +803,38 @@ function ageFrom(birthDate) {
   return { age: age, year: y };
 }
 
+// ----- Email (Brevo) -----
+// Optional. Without MAIL_API_KEY and MAIL_FROM nothing is sent and everything else still works.
+const MAIL_KEY = process.env.MAIL_API_KEY || "";
+const MAIL_FROM = process.env.MAIL_FROM || "";
+const MAIL_NAME = process.env.MAIL_NAME || "HBCU Surge";
+const SITE_URL = (process.env.SITE_URL || "").replace(/\/+$/, "");
+const NOTIFY_TO = process.env.ADMIN_NOTIFY || process.env.CONTACT_EMAIL || "";
+const mailReady = !!(MAIL_KEY && MAIL_FROM);
+
+async function sendMail(to, subject, text) {
+  if (!mailReady || !to) return false;
+  try {
+    const r = await fetch(process.env.MAIL_API_URL || "https://api.brevo.com/v3/smtp/email", {
+      method: "POST",
+      headers: { "api-key": MAIL_KEY, "content-type": "application/json", accept: "application/json" },
+      body: JSON.stringify({ sender: { email: MAIL_FROM, name: MAIL_NAME }, to: [{ email: to }], subject: subject, textContent: text })
+    });
+    if (!r.ok) {
+      console.log("Email was not sent (Brevo said " + r.status + "): " + (await r.text()).slice(0, 200));
+      return false;
+    }
+    return true;
+  } catch (error) {
+    console.log("Email was not sent: " + error.message);
+    return false;
+  }
+}
+
+function emailFooter() {
+  return "\n\n" + (SITE_URL ? "Open the Recruiting page: " + SITE_URL + "/recruiting\n" : "") + "HBCU Surge";
+}
+
 // ----- Recruiting accounts (separate from Fan Talk) -----
 const RCOOKIE = "rsession";
 
@@ -895,11 +929,18 @@ async function recruitRecover(req, res) {
   const email = String(b.email || "").trim().toLowerCase();
   const code = String(b.recoveryCode || "").replace(/[^A-Za-z0-9]/g, "").toUpperCase();
   const password = cleanPassword(b.newPassword);
+  if (limited("rrec-e:" + email, 10, 900000)) throw httpError(429, "Too many attempts for this account. Please wait 15 minutes.");
   const acct = rdb.accounts.find(function (a) { return a.email === email; });
   const attempt = await scrypt(code, acct && acct.recSalt ? acct.recSalt : "00000000000000000000000000000000", 64);
-  const ok = acct && acct.recHash && crypto.timingSafeEqual(attempt, Buffer.from(acct.recHash, "hex"));
-  if (!ok) throw httpError(401, "That email and recovery code don't match.");
+  let ok = acct && acct.recHash && crypto.timingSafeEqual(attempt, Buffer.from(acct.recHash, "hex"));
+  // ...or the short code that was emailed (good for 30 minutes)
+  if (!ok && acct && acct.resetHash && acct.resetExp > Date.now()) {
+    const tryHash = sha256(acct.resetSalt + code);
+    ok = tryHash.length === acct.resetHash.length && crypto.timingSafeEqual(Buffer.from(tryHash), Buffer.from(acct.resetHash));
+  }
+  if (!ok) throw httpError(401, "That email and code don't match.");
   if (acct.banned) throw httpError(403, "This account has been suspended.");
+  acct.resetHash = ""; acct.resetSalt = ""; acct.resetExp = 0;
   acct.salt = crypto.randomBytes(16).toString("hex");
   acct.hash = (await scrypt(password, acct.salt, 64)).toString("hex");
   const fresh = await newRecovery(acct);
@@ -907,6 +948,31 @@ async function recruitRecover(req, res) {
   const cookie = startRecruitSession(acct.id);
   saveRdb();
   sendJson(res, 200, { ok: true, recoveryCode: fresh }, { "Set-Cookie": cookie });
+}
+
+// "Email me a code" for a forgotten password. Always answers the same way, so it can't be used to find out who has an account.
+async function recruitForgot(req, res) {
+  const ip = clientIp(req);
+  if (limited("rfg:" + ip, 5, 3600000)) throw httpError(429, "Too many requests. Please try again in an hour.");
+  if (!mailReady) throw httpError(503, "Email isn't set up on this site yet. Use your recovery code instead.");
+  const b = await readJson(req);
+  const email = String(b.email || "").trim().toLowerCase();
+  const generic = { ok: true };
+  if (!email || limited("rfg-e:" + email, 3, 3600000)) return sendJson(res, 200, generic);
+  const acct = rdb.accounts.find(function (a) { return a.email === email; });
+  if (acct && !acct.banned) {
+    const letters = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+    let code = "";
+    const bytes = crypto.randomBytes(8);
+    for (let i = 0; i < 8; i++) code += letters[bytes[i] % letters.length];
+    acct.resetSalt = crypto.randomBytes(8).toString("hex");
+    acct.resetHash = sha256(acct.resetSalt + code);
+    acct.resetExp = Date.now() + 30 * 60000;
+    saveRdb();
+    await sendMail(acct.email, "Your HBCU Surge reset code",
+      "Your code to reset your Recruiting password is:\n\n    " + code + "\n\nIt works for 30 minutes. Enter it on the Recruiting page where it asks for a recovery code.\n\nIf you didn't ask for this, you can ignore this email. Your password has not changed." + emailFooter());
+  }
+  sendJson(res, 200, generic);
 }
 
 async function recruitChangePassword(req, res, user) {
@@ -1049,6 +1115,9 @@ async function recruitApply(req, res, user) {
   if (existing) rdb.apps = rdb.apps.filter(function (a) { return a !== existing; });
   rdb.apps.push(app);
   saveRdb();
+  const waiting = rdb.apps.filter(function (a) { return a.status === "pending"; }).length;
+  sendMail(NOTIFY_TO, "New recruiting request (" + waiting + " waiting)",
+    "A new " + app.role + " asked for recruiting access. " + waiting + (waiting === 1 ? " request is" : " requests are") + " waiting for review.\n\nOpen the admin page to review it" + (SITE_URL ? ": " + SITE_URL + "/admin" : ".") + "\n\nThis email has no personal details on purpose.");
   sendJson(res, 200, { app: myApp(app) });
 }
 
@@ -1400,6 +1469,15 @@ async function adminRecruitAction(req, res, action) {
   }
   app.reviewed = Date.now();
   saveRdb();
+  const to = accountEmail(app.userId);
+  if (action === "approve") {
+    sendMail(to, "Your HBCU Surge recruiting request was approved",
+      "Good news. Your recruiting request was approved and your account is now active." + emailFooter());
+  } else if (action === "reject") {
+    sendMail(to, "About your HBCU Surge recruiting request",
+      "We weren't able to approve your recruiting request this time." + (app.note ? "\n\nNote from the reviewer: " + app.note : "") +
+      "\n\nYou can log in, fix anything that was missing, and send a new request." + emailFooter());
+  }
   sendJson(res, 200, { ok: true });
 }
 
@@ -1413,6 +1491,7 @@ async function handleRecruit(req, res, url) {
     case "POST /recruit/login": return recruitLogin(req, res);
     case "POST /recruit/logout": return recruitLogout(req, res);
     case "POST /recruit/recover": return recruitRecover(req, res);
+    case "POST /recruit/forgot": return recruitForgot(req, res);
   }
 
   // Review pages are for site admins, who log in through Fan Talk
