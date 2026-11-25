@@ -333,7 +333,7 @@ label.field input {
       <button class="btn" id="dir-tab-players" type="button">Players</button>
       <button class="btn btn-plain" id="dir-tab-coaches" type="button">Coaches</button>
     </div>
-    <input id="dir-search" type="search" placeholder="Search name, school, username or sport" aria-label="Search profiles" style="width:100%;max-width:26rem;margin-bottom:0.8rem">
+    <input id="dir-search" type="search" placeholder="Search name, school, email or sport" aria-label="Search profiles" style="width:100%;max-width:26rem;margin-bottom:0.8rem">
     <div id="dir-list"></div>
   </section>
 </div>
@@ -431,7 +431,7 @@ function rpost(action, body) {
 }
 function field(label, value) { return value ? "<tr><td><b>" + esc(label) + "</b></td><td>" + value + "</td></tr>" : ""; }
 function rcard(a) {
-  var rows = field("Site username", esc(a.username)) + field("Name", esc(a.fullName)) + field("Type", esc(a.role));
+  var rows = field("Account email", esc(a.username)) + field("Name", esc(a.fullName)) + field("Type", esc(a.role));
   if (a.role === "coach") {
     rows += field("School", esc(a.teamName)) + field("Title", esc(a.title)) + field("Sports", esc((a.sports || []).join(", "))) +
       field("Staff page", '<a href="' + esc(a.staffUrl) + '" target="_blank" rel="noopener noreferrer">' + esc(a.staffUrl) + "</a>") + field("School email", esc(a.schoolEmail));
@@ -486,7 +486,7 @@ rload();
 var dirData = { players: [], coaches: [] }, dirTab = "players";
 function dline(label, value) { return value || value === 0 ? "<tr><td><b>" + esc(label) + "</b></td><td>" + esc(value) + "</td></tr>" : ""; }
 function dplayer(p) {
-  var pr = p.profile, rows = dline("Site username", p.username) + dline("Status", p.status) + dline("Age group", p.minor ? "Under 18 (born " + p.birthYear + ")" : "18 or older (born " + p.birthYear + ")") +
+  var pr = p.profile, rows = dline("Account email", p.username) + dline("Status", p.status) + dline("Age group", p.minor ? "Under 18 (born " + p.birthYear + ")" : "18 or older (born " + p.birthYear + ")") +
     dline("Level", p.level) + dline("Sport / class", p.sport + " / " + p.gradYear) + dline("School", p.hsSchool + ", " + p.city + ", " + p.state);
   if (p.guardian) rows += dline("Guardian", p.guardian.name + " (" + p.guardian.relationship + ")") + dline("Guardian phone", p.guardian.phone) + dline("Guardian email", p.guardian.email);
   if (pr) {
@@ -501,7 +501,7 @@ function dplayer(p) {
   return '<div class="card" style="margin-bottom:0.8rem;box-shadow:none;border:1px solid var(--line)"><h3>' + esc(p.fullName) + '</h3><div class="admin-scroll"><table class="admin-table"><tbody>' + rows + "</tbody></table></div></div>";
 }
 function dcoach(c) {
-  var rows = dline("Site username", c.username) + dline("Status", c.status) + dline("School", c.teamName) + dline("Title", c.title) + dline("Sports", c.sports.join(", ")) + dline("School email", c.schoolEmail) +
+  var rows = dline("Account email", c.username) + dline("Status", c.status) + dline("School", c.teamName) + dline("Title", c.title) + dline("Sports", c.sports.join(", ")) + dline("School email", c.schoolEmail) +
     (c.staffUrl ? "<tr><td><b>Staff page</b></td><td><a href=\"" + esc(c.staffUrl) + "\" target=\"_blank\" rel=\"noopener noreferrer\">" + esc(c.staffUrl) + "</a></td></tr>" : "");
   return '<div class="card" style="margin-bottom:0.8rem;box-shadow:none;border:1px solid var(--line)"><h3>' + esc(c.fullName) + '</h3><div class="admin-scroll"><table class="admin-table"><tbody>' + rows + "</tbody></table></div></div>";
 }
