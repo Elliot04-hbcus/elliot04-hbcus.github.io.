@@ -702,14 +702,15 @@ async function handleFan(req, res, url) {
 
 // ---------------------------------------------------------------------
 //  Recruiting: a locked area for verified players and coaches.
-//  Everything here needs a Fan Talk login AND approval from an admin.
+//  It has its own accounts (email and password), separate from Fan Talk,
+//  and every account needs approval from an admin before it is active.
 //  Saved in recruit-data.json (separate from the Fan Talk data).
 //  Players and coaches only ever see each other through this area:
 //  email addresses and phone numbers are never shown, and messages that
 //  contain them are blocked.
 // ---------------------------------------------------------------------
 const RDATA_FILE = path.join(DATA_DIR, "recruit-data.json");
-let rdb = { apps: [], profiles: [], threads: [], messages: [], reports: [] };
+let rdb = { accounts: [], sessions: [], apps: [], profiles: [], threads: [], messages: [], reports: [] };
 
 function loadRdb() {
   try {
@@ -798,6 +799,133 @@ function ageFrom(birthDate) {
   if (age < 13) throw httpError(403, "Players must be 13 or older to use recruiting.");
   if (age > 45) throw httpError(400, "Please check the date of birth.");
   return { age: age, year: y };
+}
+
+// ----- Recruiting accounts (separate from Fan Talk) -----
+const RCOOKIE = "rsession";
+
+function currentRecruitUser(req) {
+  const token = getCookie(req, RCOOKIE);
+  if (!token) return null;
+  const hash = sha256(token);
+  const s = rdb.sessions.find(function (x) { return x.tokenHash === hash && x.expires > Date.now(); });
+  if (!s) return null;
+  const a = rdb.accounts.find(function (x) { return x.id === s.accountId; }) || null;
+  return a && !a.banned ? a : null;
+}
+
+function startRecruitSession(accountId) {
+  const token = crypto.randomBytes(32).toString("hex");
+  rdb.sessions = rdb.sessions.filter(function (s) { return s.expires > Date.now(); });
+  rdb.sessions.push({ tokenHash: sha256(token), accountId: accountId, expires: Date.now() + SESSION_DAYS * 86400000 });
+  return RCOOKIE + "=" + token + "; HttpOnly; SameSite=Lax; Path=/; Max-Age=" + SESSION_DAYS * 86400 + (TRUST_PROXY ? "; Secure" : "");
+}
+
+const RCOOKIE_CLEAR = RCOOKIE + "=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0";
+
+function cleanEmail(v) {
+  const e = String(v || "").trim().toLowerCase();
+  if (e.length > 120 || !/^[^\s@,;<>()"]+@[^\s@,;<>()"]+\.[a-z]{2,}$/.test(e)) throw httpError(400, "Please enter a valid email address.");
+  return e;
+}
+
+function cleanPassword(v) {
+  const p = String(v || "");
+  if (p.length < 8 || p.length > 100) throw httpError(400, "Passwords must be 8 to 100 characters.");
+  return p;
+}
+
+async function newRecovery(acct) {
+  const code = makeRecoveryCode();
+  acct.recSalt = crypto.randomBytes(16).toString("hex");
+  acct.recHash = (await scrypt(code.replace(/-/g, ""), acct.recSalt, 64)).toString("hex");
+  return code;
+}
+
+async function recruitRegister(req, res) {
+  const ip = clientIp(req);
+  if (limited("rreg:" + ip, 5, 3600000)) throw httpError(429, "Too many sign-ups from this connection. Please try again later.");
+  const b = await readJson(req);
+  const email = cleanEmail(b.email);
+  const password = cleanPassword(b.password);
+  if (b.ageOk !== true) throw httpError(400, "Please confirm that you are 13 or older and agree to the recruiting rules.");
+  if (rdb.accounts.some(function (a) { return a.email === email; })) throw httpError(409, "That email already has an account. Try logging in.");
+  const salt = crypto.randomBytes(16).toString("hex");
+  const hash = (await scrypt(password, salt, 64)).toString("hex");
+  if (rdb.accounts.some(function (a) { return a.email === email; })) throw httpError(409, "That email already has an account. Try logging in.");
+  const acct = { id: rid(), email: email, salt: salt, hash: hash, banned: false, created: Date.now() };
+  const code = await newRecovery(acct);
+  rdb.accounts.push(acct);
+  const cookie = startRecruitSession(acct.id);
+  saveRdb();
+  sendJson(res, 200, { ok: true, recoveryCode: code }, { "Set-Cookie": cookie });
+}
+
+async function recruitLogin(req, res) {
+  const ip = clientIp(req);
+  if (limited("rlog:" + ip, 10, 900000)) throw httpError(429, "Too many log-in attempts. Please wait 15 minutes.");
+  const b = await readJson(req);
+  const email = String(b.email || "").trim().toLowerCase();
+  if (limited("rlog-e:" + email, 10, 900000)) throw httpError(429, "Too many log-in attempts for this account. Please wait 15 minutes.");
+  const password = String(b.password || "");
+  const acct = rdb.accounts.find(function (a) { return a.email === email; });
+  const attempt = await scrypt(password, acct ? acct.salt : "00000000000000000000000000000000", 64);
+  const ok = acct && crypto.timingSafeEqual(attempt, Buffer.from(acct.hash, "hex"));
+  if (!ok) throw httpError(401, "Incorrect email or password.");
+  if (acct.banned) throw httpError(403, "This account has been suspended.");
+  const cookie = startRecruitSession(acct.id);
+  saveRdb();
+  sendJson(res, 200, { ok: true }, { "Set-Cookie": cookie });
+}
+
+function recruitLogout(req, res) {
+  const token = getCookie(req, RCOOKIE);
+  if (token) {
+    const hash = sha256(token);
+    rdb.sessions = rdb.sessions.filter(function (s) { return s.tokenHash !== hash; });
+    saveRdb();
+  }
+  sendJson(res, 200, { ok: true }, { "Set-Cookie": RCOOKIE_CLEAR });
+}
+
+async function recruitRecover(req, res) {
+  const ip = clientIp(req);
+  if (limited("rrec:" + ip, 10, 900000)) throw httpError(429, "Too many attempts. Please wait 15 minutes.");
+  const b = await readJson(req);
+  const email = String(b.email || "").trim().toLowerCase();
+  const code = String(b.recoveryCode || "").replace(/[^A-Za-z0-9]/g, "").toUpperCase();
+  const password = cleanPassword(b.newPassword);
+  const acct = rdb.accounts.find(function (a) { return a.email === email; });
+  const attempt = await scrypt(code, acct && acct.recSalt ? acct.recSalt : "00000000000000000000000000000000", 64);
+  const ok = acct && acct.recHash && crypto.timingSafeEqual(attempt, Buffer.from(acct.recHash, "hex"));
+  if (!ok) throw httpError(401, "That email and recovery code don't match.");
+  if (acct.banned) throw httpError(403, "This account has been suspended.");
+  acct.salt = crypto.randomBytes(16).toString("hex");
+  acct.hash = (await scrypt(password, acct.salt, 64)).toString("hex");
+  const fresh = await newRecovery(acct);
+  rdb.sessions = rdb.sessions.filter(function (s) { return s.accountId !== acct.id; });
+  const cookie = startRecruitSession(acct.id);
+  saveRdb();
+  sendJson(res, 200, { ok: true, recoveryCode: fresh }, { "Set-Cookie": cookie });
+}
+
+async function recruitChangePassword(req, res, user) {
+  if (limited("rchg:" + user.id, 10, 900000)) throw httpError(429, "Too many attempts. Please wait 15 minutes.");
+  const b = await readJson(req);
+  const attempt = await scrypt(String(b.password || ""), user.salt, 64);
+  if (!crypto.timingSafeEqual(attempt, Buffer.from(user.hash, "hex"))) throw httpError(401, "Your current password is not right.");
+  const next = cleanPassword(b.newPassword);
+  user.salt = crypto.randomBytes(16).toString("hex");
+  user.hash = (await scrypt(next, user.salt, 64)).toString("hex");
+  const keep = sha256(getCookie(req, RCOOKIE));
+  rdb.sessions = rdb.sessions.filter(function (s) { return s.accountId !== user.id || s.tokenHash === keep; });
+  saveRdb();
+  sendJson(res, 200, { ok: true });
+}
+
+function accountEmail(userId) {
+  const a = rdb.accounts.find(function (x) { return x.id === userId; });
+  return a ? a.email : "(removed)";
 }
 
 function getApp(user) {
@@ -926,7 +1054,7 @@ async function recruitApply(req, res, user) {
 
 function recruitMe(res, user) {
   const app = getApp(user);
-  const out = { username: user.username, app: app ? myApp(app) : null, admin: isAdmin(user) };
+  const out = { email: user.email, app: app ? myApp(app) : null };
   if (app && app.status === "approved") {
     if (app.role === "player") {
       const p = ensureProfile(app);
@@ -1180,16 +1308,15 @@ async function deleteMyRecruiting(req, res, user) {
   rdb.reports = rdb.reports.filter(function (r) { return gone.indexOf(r.threadId) === -1; });
   rdb.profiles = rdb.profiles.filter(function (p) { return p.userId !== user.id; });
   rdb.apps = rdb.apps.filter(function (a) { return a.userId !== user.id; });
+  rdb.accounts = rdb.accounts.filter(function (a) { return a.id !== user.id; });
+  rdb.sessions = rdb.sessions.filter(function (s) { return s.accountId !== user.id; });
   saveRdb();
-  sendJson(res, 200, { ok: true });
+  sendJson(res, 200, { ok: true }, { "Set-Cookie": RCOOKIE_CLEAR });
 }
 
 // ----- Admin review -----
 function adminRecruit(res) {
-  function who(a) {
-    const u = db.users.find(function (x) { return x.id === a.userId; });
-    return u ? u.username : "(removed)";
-  }
+  function who(a) { return accountEmail(a.userId); }
   function full(a) {
     return Object.assign({}, a, { username: who(a), teamName: teamOf(a), userId: undefined });
   }
@@ -1219,10 +1346,7 @@ function adminRecruit(res) {
 
 // Read-only list of every player profile and coach account (admins only)
 function adminDirectory(res) {
-  function uname(a) {
-    const u = db.users.find(function (x) { return x.id === a.userId; });
-    return u ? u.username : "(removed)";
-  }
+  function uname(a) { return accountEmail(a.userId); }
   const players = [], coaches = [];
   rdb.apps.forEach(function (a) {
     if (a.role === "coach") {
@@ -1281,8 +1405,26 @@ async function adminRecruitAction(req, res, action) {
 
 async function handleRecruit(req, res, url) {
   if (req.method === "POST" && !sameOrigin(req)) throw httpError(403, "Blocked request.");
-  const user = requireUser(currentUser(req));
   const route = req.method + " " + url.pathname;
+
+  // Sign-up, log-in and password recovery (no account needed yet)
+  switch (route) {
+    case "POST /recruit/register": return recruitRegister(req, res);
+    case "POST /recruit/login": return recruitLogin(req, res);
+    case "POST /recruit/logout": return recruitLogout(req, res);
+    case "POST /recruit/recover": return recruitRecover(req, res);
+  }
+
+  // Review pages are for site admins, who log in through Fan Talk
+  if (url.pathname.indexOf("/recruit/admin/") === 0) {
+    const admin = requireAdmin(requireUser(currentUser(req)));
+    if (route === "GET /recruit/admin/overview") return adminRecruit(res);
+    if (route === "GET /recruit/admin/directory") return adminDirectory(res);
+    if (req.method === "POST") return adminRecruitAction(req, res, url.pathname.slice("/recruit/admin/".length));
+    throw httpError(404, "Not found.");
+  }
+
+  const user = requireUser(currentRecruitUser(req));
 
   switch (route) {
     case "GET /recruit/me": return recruitMe(res, user);
@@ -1299,16 +1441,7 @@ async function handleRecruit(req, res, url) {
     case "POST /recruit/block": return blockThread(req, res, user);
     case "POST /recruit/report": return reportThread(req, res, user);
     case "POST /recruit/delete-my-data": return deleteMyRecruiting(req, res, user);
-    case "GET /recruit/admin/overview":
-      requireAdmin(user);
-      return adminRecruit(res);
-    case "GET /recruit/admin/directory":
-      requireAdmin(user);
-      return adminDirectory(res);
-  }
-  if (req.method === "POST" && url.pathname.indexOf("/recruit/admin/") === 0) {
-    requireAdmin(user);
-    return adminRecruitAction(req, res, url.pathname.slice("/recruit/admin/".length));
+    case "POST /recruit/password": return recruitChangePassword(req, res, user);
   }
   throw httpError(404, "Not found.");
 }
