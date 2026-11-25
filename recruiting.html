@@ -356,6 +356,12 @@ label.field small { font-weight: 400; color: var(--muted); }
   .bub { max-width: 92%; }
 }
 .prof-hero .rc-badge:not(.good):not(.warn) { background: rgba(255, 255, 255, 0.16); color: #fff; border-color: transparent; }
+
+/* ----- separate recruiting login ----- */
+.linklike { background: none; border: 0; padding: 0; color: var(--accent); font: inherit; text-decoration: underline; cursor: pointer; }
+.rc-bar { margin: 0 0 0.8rem; color: var(--muted); font-size: 0.85rem; }
+.rc-check { display: flex; gap: 0.5rem; align-items: flex-start; margin: 0.4rem 0 0.8rem; font-size: 0.9rem; }
+.rc-check input { margin-top: 0.2rem; flex: none; }
 </style>
 </head>
 
@@ -377,13 +383,52 @@ label.field small { font-weight: 400; color: var(--muted); }
 <main class="page">
 <div class="rc" id="rc">
   <div class="card muted" id="loading">Loading&hellip;</div>
+  <p class="rc-bar" id="rc-bar" hidden><span id="rc-who"></span> <button class="linklike" id="rc-out" type="button">Log out</button></p>
 
   <!-- Not logged in -->
   <section class="card rc-narrow" id="v-login" hidden>
     <h1>Recruiting</h1>
-    <p>This area is only for <strong>verified players and college coaches</strong> from SWAC and MEAC schools. Every account is reviewed by hand before it can be used.</p>
-    <p>Log in with your Fan Talk account to start. If you don't have one yet, create it first and then come back to this page.</p>
-    <p><a class="btn" href="/fan-talk" style="display:inline-block;text-decoration:none;line-height:1.7">Log in or sign up on Fan Talk</a></p>
+    <p>This area is only for <strong>verified players and college coaches</strong> from SWAC and MEAC schools. It has its own account, separate from Fan Talk, and every account is reviewed by hand before it can be used.</p>
+    <div class="auth-tabs" role="tablist">
+      <button class="auth-tab active" id="lt-login" type="button">Log in</button>
+      <button class="auth-tab" id="lt-signup" type="button">Create account</button>
+    </div>
+
+    <form id="rl-form" novalidate>
+      <label class="field">Email<input id="rl-email" type="email" maxlength="120" autocomplete="email"></label>
+      <label class="field">Password<input id="rl-pass" type="password" maxlength="100" autocomplete="current-password"></label>
+      <button class="btn btn-wide" type="submit">Log in</button>
+      <p class="error" id="rl-err" role="alert"></p>
+      <p class="muted"><button class="linklike" id="rl-forgot" type="button">Forgot your password?</button></p>
+    </form>
+
+    <form id="rs-form" novalidate hidden>
+      <label class="field">Email<input id="rs-email" type="email" maxlength="120" autocomplete="email"></label>
+      <label class="field">Password <small>(8 or more characters)</small><input id="rs-pass" type="password" maxlength="100" autocomplete="new-password"></label>
+      <label class="rc-check"><input id="rs-age" type="checkbox"><span>I am 13 or older and I agree to the <a href="rules.html">recruiting rules</a> and <a href="privacy.html">privacy page</a>.</span></label>
+      <button class="btn btn-wide" type="submit">Create account</button>
+      <p class="error" id="rs-err" role="alert"></p>
+      <p class="muted">Use an email only you can read. Coaches never see it. Players under 18: a parent or guardian helps with the next step.</p>
+    </form>
+
+    <form id="rr-form" novalidate hidden>
+      <h3>Reset your password</h3>
+      <p class="muted">Enter the recovery code you were shown when you created your account.</p>
+      <label class="field">Email<input id="rr-email" type="email" maxlength="120" autocomplete="email"></label>
+      <label class="field">Recovery code<input id="rr-code" maxlength="40" autocomplete="off"></label>
+      <label class="field">New password<input id="rr-pass" type="password" maxlength="100" autocomplete="new-password"></label>
+      <button class="btn btn-wide" type="submit">Reset password</button>
+      <p class="error" id="rr-err" role="alert"></p>
+      <p class="muted"><button class="linklike" id="rr-back" type="button">Back to log in</button></p>
+    </form>
+  </section>
+
+  <!-- Recovery code (shown once) -->
+  <section class="card rc-narrow" id="v-code" hidden>
+    <h2>Save your recovery code</h2>
+    <p>If you forget your password, this code is the only way to get back in, because we don't send emails yet. It is shown <strong>once</strong>. Screenshot it or write it down somewhere safe.</p>
+    <div class="recovery"><code id="rc-code"></code></div>
+    <p><button class="btn btn-plain" id="rc-copy" type="button">Copy code</button> <button class="btn" id="rc-done" type="button">I saved it</button></p>
   </section>
 
   <!-- Choose a role / request access -->
@@ -538,7 +583,9 @@ var MEAS_LABELS = { forty: "40-yard dash (sec)", vertical: "Vertical (in)", benc
 var S = { me: null, teams: [], tab: "", timer: null, convo: "", filters: { sport: "", year: "", pos: "", state: "", status: "", minGpa: "", q: "" } };
 
 function show(id) {
-  ["loading", "v-login", "v-apply", "v-status", "v-main"].forEach(function (x) { $(x).hidden = x !== id; });
+  ["loading", "v-login", "v-code", "v-apply", "v-status", "v-main"].forEach(function (x) { $(x).hidden = x !== id; });
+  $("rc-bar").hidden = !(S.me && S.me.email && ["v-apply", "v-status", "v-main"].indexOf(id) !== -1);
+  if (S.me && S.me.email) $("rc-who").textContent = "Signed in as " + S.me.email + ".";
   window.scrollTo(0, 0);
 }
 function fmtHeight(n) { return n ? Math.floor(n / 12) + "′" + (n % 12) + "″" : ""; }
@@ -555,7 +602,7 @@ async function init() {
   var t = await api("/fan/teams");
   S.teams = (t.data && t.data.teams) || [];
   var r = await api("/recruit/me");
-  if (r.status === 401) { show("v-login"); return; }
+  if (r.status === 401) { S.me = null; show("v-login"); return; }
   if (!r.ok) { $("loading").textContent = r.data.error || "Could not load. Please try again."; return; }
   S.me = r.data;
   route();
@@ -1002,18 +1049,89 @@ async function openConvo(id, scroll) {
 function renderAccount() {
   var app = S.me.app;
   $("m-panel").innerHTML = '<div class="card rc-narrow" style="margin:0"><h2>Your account</h2>' +
-    "<p>Signed in as <strong>" + esc(S.me.username) + "</strong>. " + (app.role === "coach" ? "Coach at " + esc(app.teamName) + "." : "Player.") + "</p>" +
+    "<p>Signed in as <strong>" + esc(S.me.email) + "</strong>. " + (app.role === "coach" ? "Coach at " + esc(app.teamName) + "." : "Player.") + "</p>" +
     '<p class="muted">Reviewers can see the details you gave when you requested access (including a parent or guardian\'s contact details for players under 18). Coaches never see your email or phone. Messages are private to the two people in them, but a reviewer can read a conversation that is reported.</p>' +
-    '<div class="rc-section"><h3>Delete my recruiting data</h3><p class="muted">Removes your request, profile, messages and board. This can\'t be undone. Your Fan Talk account stays.</p>' +
+    '<div class="rc-section"><h3>Change password</h3><form id="acc-pw" novalidate><label class="field">Current password<input id="acc-pw-old" type="password" autocomplete="current-password"></label>' +
+    '<label class="field">New password<input id="acc-pw-new" type="password" autocomplete="new-password"></label>' +
+    '<button class="btn" type="submit">Change password</button><p class="rc-ok" id="acc-pw-ok" role="status"></p><p class="error" id="acc-pw-err" role="alert"></p></form></div>' +
+    '<div class="rc-section"><button class="btn btn-plain" id="acc-out" type="button">Log out</button></div>' +
+    '<div class="rc-section"><h3>Delete my recruiting data</h3><p class="muted">Removes your account, request, profile, messages and board. This can\'t be undone. Your Fan Talk account, if you have one, is not touched.</p>' +
     '<button class="btn btn-dark" id="acc-del" type="button">Delete my recruiting data</button></div></div>';
+  $("acc-out").addEventListener("click", doLogout);
+  $("acc-pw").addEventListener("submit", async function (e) {
+    e.preventDefault();
+    $("acc-pw-ok").textContent = ""; $("acc-pw-err").textContent = "";
+    var r = await api("/recruit/password", { password: $("acc-pw-old").value, newPassword: $("acc-pw-new").value });
+    if (r.ok) { $("acc-pw-ok").textContent = "Password changed."; $("acc-pw-old").value = ""; $("acc-pw-new").value = ""; }
+    else $("acc-pw-err").textContent = r.data.error || "Could not change it.";
+  });
   $("acc-del").addEventListener("click", async function () {
     if (!window.confirm("Delete your recruiting request, profile and messages? This can't be undone.")) return;
     var r = await api("/recruit/delete-my-data", { confirm: "DELETE" });
-    if (r.ok) { if (S.timer) clearInterval(S.timer); var m = await api("/recruit/me"); S.me = m.data; route(); }
+    if (r.ok) { if (S.timer) clearInterval(S.timer); S.me = null; show("v-login"); }
   });
 }
 
-fetch("/fan/config").then(function (r) { return r.ok ? r.json() : {}; }).catch(function () { return {}; });
+/* ---------- Log in, sign up, recover ---------- */
+function loginTab(which) {
+  $("lt-login").classList.toggle("active", which === "login");
+  $("lt-signup").classList.toggle("active", which === "signup");
+  $("rl-form").hidden = which !== "login";
+  $("rs-form").hidden = which !== "signup";
+  $("rr-form").hidden = which !== "recover";
+}
+$("lt-login").addEventListener("click", function () { loginTab("login"); });
+$("lt-signup").addEventListener("click", function () { loginTab("signup"); });
+$("rl-forgot").addEventListener("click", function () { loginTab("recover"); });
+$("rr-back").addEventListener("click", function () { loginTab("login"); });
+
+function showCode(code) {
+  $("rc-code").textContent = code;
+  $("rc-copy").textContent = "Copy code";
+  show("v-code");
+}
+$("rc-copy").addEventListener("click", function () {
+  var code = $("rc-code").textContent;
+  var note = function (t) { $("rc-copy").textContent = t; };
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(code).then(function () { note("Copied!"); }, function () { note("Copy it by hand"); });
+  else note("Copy it by hand");
+});
+$("rc-done").addEventListener("click", function () { $("rc-code").textContent = ""; init(); });
+
+$("rl-form").addEventListener("submit", async function (e) {
+  e.preventDefault();
+  $("rl-err").textContent = "";
+  var r = await api("/recruit/login", { email: $("rl-email").value, password: $("rl-pass").value });
+  if (!r.ok) { $("rl-err").textContent = r.data.error || "Could not log in."; return; }
+  $("rl-pass").value = "";
+  init();
+});
+$("rs-form").addEventListener("submit", async function (e) {
+  e.preventDefault();
+  $("rs-err").textContent = "";
+  var r = await api("/recruit/register", { email: $("rs-email").value, password: $("rs-pass").value, ageOk: $("rs-age").checked });
+  if (!r.ok) { $("rs-err").textContent = r.data.error || "Could not create the account."; return; }
+  $("rs-pass").value = "";
+  showCode(r.data.recoveryCode);
+});
+$("rr-form").addEventListener("submit", async function (e) {
+  e.preventDefault();
+  $("rr-err").textContent = "";
+  var r = await api("/recruit/recover", { email: $("rr-email").value, recoveryCode: $("rr-code").value, newPassword: $("rr-pass").value });
+  if (!r.ok) { $("rr-err").textContent = r.data.error || "Could not reset the password."; return; }
+  $("rr-pass").value = ""; $("rr-code").value = "";
+  showCode(r.data.recoveryCode);
+});
+
+async function doLogout() {
+  await api("/recruit/logout", {});
+  if (S.timer) clearInterval(S.timer);
+  S.me = null;
+  show("v-login");
+  loginTab("login");
+}
+$("rc-out").addEventListener("click", doLogout);
+
 init();
 
 </script>
