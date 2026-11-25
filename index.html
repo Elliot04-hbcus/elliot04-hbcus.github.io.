@@ -250,6 +250,16 @@ h4 { margin: 1.2rem 0 0.5rem; font-size: 0.95rem; }
 }
 .team-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-hover); }
 .team-card-conf { color: var(--accent); font-size: 0.7rem; font-weight: 800; letter-spacing: 0.04em; }
+.team-card-top { display: flex; align-items: center; gap: 0.6rem; min-width: 0; }
+.team-logo { width: 36px; height: 36px; flex: none; object-fit: contain; background: #fff; border-radius: 6px; padding: 2px; }
+.team-logo.big { width: 52px; height: 52px; }
+.player-cell { display: flex; align-items: center; gap: 0.6rem; }
+.avatar {
+  position: relative; flex: none; width: 34px; height: 34px; border-radius: 50%; overflow: hidden;
+  background: var(--thead); color: #e6e6e6; font-size: 0.7rem; font-weight: 800;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.avatar img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; background: var(--card); }
 
 .subtabs { display: flex; flex-wrap: wrap; gap: 0.3rem; margin: 0.8rem 0 1rem; border-bottom: 2px solid var(--line); }
 .subtab {
@@ -587,6 +597,7 @@ th { background: var(--thead); color: #fff; font-size: 0.8rem; text-transform: u
     <button id="team-back" class="nav-btn">&larr; All teams</button>
 
     <div class="team-head">
+      <img id="team-logo" class="team-logo big" alt="" hidden draggable="false">
       <h2 id="team-title"></h2>
       <span id="team-conf-tag" class="team-conf-tag"></span>
       <button id="team-follow" class="nav-btn nav-btn-alt" aria-pressed="false">&#9734; Follow</button>
@@ -595,6 +606,7 @@ th { background: var(--thead); color: #fff; font-size: 0.8rem; text-transform: u
     <div id="detail-tabs" class="subtabs" aria-label="Choose what to view">
       <button class="subtab active" data-ttab="schedule">Schedule</button>
       <button class="subtab" data-ttab="roster">Roster</button>
+      <button class="subtab" data-ttab="coaches">Coaches</button>
     </div>
 
     <div id="schedule-pane">
@@ -604,6 +616,16 @@ th { background: var(--thead); color: #fff; font-size: 0.8rem; text-transform: u
         <table class="schedule-table">
           <thead><tr><th>Date</th><th>Opponent</th><th>Result / Time</th></tr></thead>
           <tbody id="team-schedule-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div id="coaches-pane" hidden>
+      <p id="coaches-status" class="status-line"></p>
+      <div class="table-wrap">
+        <table class="roster-table">
+          <thead><tr><th>Name</th><th>Role</th></tr></thead>
+          <tbody id="coaches-body"></tbody>
         </table>
       </div>
     </div>
@@ -1141,6 +1163,37 @@ var rawScheduleCache = {};
 var rosterCache = {};
 var statsCache = {};
 
+// Turns an image address from the data into one served by this site.
+// Only works when the page is served by server.js (it does the fetching).
+function imgSrc(href) {
+  if (!USE_SERVER || typeof href !== "string") return "";
+  try {
+    var u = new URL(href);
+    if (!/espncdn\.com$/i.test(u.hostname)) return "";
+    return "/api/img" + u.pathname + u.search;
+  } catch (error) { return ""; }
+}
+
+function logoOf(team) {
+  var list = (team && team.logos) || [];
+  var pick = list.filter(function (l) { return l && l.href && (l.rel || []).indexOf("default") !== -1; })[0] || list[0];
+  return imgSrc((pick && pick.href) || (team && team.logo));
+}
+
+function initialsOf(name) {
+  var parts = String(name || "").replace(/[^A-Za-z' .-]/g, "").trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "?";
+  return (parts[0][0] + (parts.length > 1 ? parts[parts.length - 1][0] : "")).toUpperCase();
+}
+
+// A picture that quietly disappears if it can't load
+document.addEventListener("error", function (event) {
+  var el = event.target;
+  if (el && el.tagName === "IMG" && el.hasAttribute("data-hide")) {
+    if (el.id) el.hidden = true; else el.remove();
+  }
+}, true);
+
 function pickConferenceTeams(rawTeams) {
   var seen = {};
   var teams = [];
@@ -1154,7 +1207,8 @@ function pickConferenceTeams(rawTeams) {
       name: team.location || team.displayName,
       fullName: team.displayName,
       conf: conf,
-      color: team.color || ""
+      color: team.color || "",
+      logo: logoOf(team) || (team.id ? imgSrc("https://a.espncdn.com/i/teamlogos/ncaa/500/" + team.id + ".png") : "")
     });
   });
   return teams;
@@ -1217,7 +1271,7 @@ async function discoverFromGames(sport, notes) {
 async function loadTeams(sport, notes) {
   if (teamsCache[sport]) return teamsCache[sport];
 
-  var saved = readStored("teams|" + sport, 86400000);
+  var saved = readStored("teams2|" + sport, 86400000);
   if (saved && saved.value && saved.value.length > 0) {
     teamsCache[sport] = saved.value;
     return saved.value;
@@ -1238,7 +1292,7 @@ async function loadTeams(sport, notes) {
   teams.sort(function (a, b) { return a.name.localeCompare(b.name); });
   if (teams.length > 0) {
     teamsCache[sport] = teams;
-    writeStored("teams|" + sport, teams);
+    writeStored("teams2|" + sport, teams);
   }
   return teams;
 }
@@ -1430,15 +1484,46 @@ function toPlayer(a) {
     height: a.displayHeight || "",
     weight: a.displayWeight || "",
     year: (a.experience && a.experience.displayValue) || "",
-    hometown: [birth.city, birth.state].filter(Boolean).join(", ")
+    hometown: [birth.city, birth.state].filter(Boolean).join(", "),
+    photo: imgSrc(a.headshot && a.headshot.href)
   };
+}
+
+// A team's coaches, read from the same team data as the roster
+var coachCache = {};
+async function loadCoaches(sport, teamId) {
+  var key = sport + "|" + teamId;
+  if (coachCache[key]) return coachCache[key];
+
+  var saved = readStored("coaches|" + key, 43200000);
+  if (saved && saved.value) { coachCache[key] = saved.value; return saved.value; }
+
+  var json = await fetchJson(CONFIG.apiBase + leagueOf(sport) + "/teams/" + teamId + "/roster");
+  var raw = [].concat(json.coach || [], json.coaches || []);
+  var seen = {};
+  var coaches = raw.map(function (c, index) {
+    var name = c.fullName || c.displayName || [c.firstName, c.lastName].filter(Boolean).join(" ");
+    return {
+      name: name,
+      role: (c.position && (c.position.displayName || c.position)) || c.title || (index === 0 ? "Head Coach" : "Coach"),
+      photo: imgSrc(c.headshot && c.headshot.href)
+    };
+  }).filter(function (c) {
+    if (!c.name || seen[c.name]) return false;
+    seen[c.name] = true;
+    return true;
+  });
+
+  coachCache[key] = coaches;
+  writeStored("coaches|" + key, coaches);
+  return coaches;
 }
 
 async function loadRoster(sport, teamId) {
   var key = sport + "|" + teamId;
   if (rosterCache[key]) return rosterCache[key];
 
-  var saved = readStored("roster|" + key, 43200000);
+  var saved = readStored("roster2|" + key, 43200000);
   if (saved && saved.value && saved.value.length > 0) {
     rosterCache[key] = saved.value;
     return saved.value;
@@ -1466,7 +1551,7 @@ async function loadRoster(sport, teamId) {
   });
 
   rosterCache[key] = players;
-  if (players.length > 0) writeStored("roster|" + key, players);
+  if (players.length > 0) writeStored("roster2|" + key, players);
   return players;
 }
 
@@ -2021,7 +2106,8 @@ var tv = {
   roster: null,
   teamsRequest: 0,
   scheduleRequest: 0,
-  rosterRequest: 0
+  rosterRequest: 0,
+  coachRequest: 0
 };
 
 // Highlights one sub-tab button in a group
@@ -2070,7 +2156,9 @@ function renderTeamCard(team) {
   var fav = isFavoriteName(team.name);
   return '<div class="team-card-wrap">' +
     '<button class="team-card" data-key="' + esc(teamKey(team)) + '" style="border-left-color: ' + color + '">' +
-    '<span class="team-card-name">' + esc(team.name) + "</span>" +
+    '<span class="team-card-top">' +
+    (team.logo ? '<img class="team-logo" src="' + esc(team.logo) + '" alt="" loading="lazy" draggable="false" data-hide>' : "") +
+    '<span class="team-card-name">' + esc(team.name) + "</span></span>" +
     '<span class="team-card-conf">' + esc(team.conf) + "</span></button>" +
     '<button class="fav-toggle' + (fav ? " on" : "") + '" data-fav="' + esc(team.name) + '" data-key="' + esc(teamKey(team)) +
     '" aria-pressed="' + (fav ? "true" : "false") + '" aria-label="' + (fav ? "Remove " : "Add ") + esc(team.name) +
@@ -2110,11 +2198,14 @@ function openTeam(team) {
   $("teams-list-panel").hidden = true;
   $("team-panel").hidden = false;
   $("team-title").textContent = team.fullName;
+  var bigLogo = $("team-logo");
+  if (team.logo) { bigLogo.hidden = false; bigLogo.src = team.logo; } else { bigLogo.hidden = true; bigLogo.removeAttribute("src"); }
   $("team-conf-tag").textContent = team.conf;
   updateFollowButton();
   $("roster-search").value = "";
   $("team-schedule-body").innerHTML = "";
   $("roster-body").innerHTML = "";
+  $("coaches-body").innerHTML = "";
   window.scrollTo(0, 0);
 
   showDetailTab("schedule");
@@ -2125,8 +2216,10 @@ function showDetailTab(name) {
   setActiveIn("detail-tabs", "data-ttab", name);
   $("schedule-pane").hidden = name !== "schedule";
   $("roster-pane").hidden = name !== "roster";
+  $("coaches-pane").hidden = name !== "coaches";
 
   if (name === "schedule") loadScheduleTab();
+  else if (name === "coaches") loadCoachesTab();
   else loadRosterTab();
 }
 
@@ -2224,6 +2317,37 @@ async function loadRosterTab() {
   renderRoster();
 }
 
+async function loadCoachesTab() {
+  var team = tv.team;
+  var request = ++tv.coachRequest;
+  $("coaches-body").innerHTML = skelRows(2, 4);
+  $("coaches-status").textContent = "Loading coaches\u2026";
+
+  try {
+    var ready = await resolveTeam(team);
+    if (request !== tv.coachRequest || tv.team !== team) return;
+    var coaches = await loadCoaches(state.sport, ready.id);
+    if (request !== tv.coachRequest || tv.team !== team) return;
+
+    if (coaches.length === 0) {
+      $("coaches-body").innerHTML = "";
+      $("coaches-status").textContent = "No coaches are listed for this team yet.";
+      return;
+    }
+    $("coaches-status").textContent = coaches.length + (coaches.length === 1 ? " coach" : " coaches");
+    $("coaches-body").innerHTML = coaches.map(function (c) {
+      return '<tr><td><span class="player-cell"><span class="avatar">' + esc(initialsOf(c.name)) +
+        (c.photo ? '<img src="' + esc(c.photo) + '" alt="" loading="lazy" draggable="false" data-hide>' : "") + "</span>" +
+        "<span>" + esc(c.name) + "</span></span></td><td>" + esc(c.role) + "</td></tr>";
+    }).join("");
+  } catch (error) {
+    console.error(error);
+    if (request !== tv.coachRequest || tv.team !== team) return;
+    $("coaches-body").innerHTML = "";
+    $("coaches-status").textContent = "Could not load the coaches (" + error.message + ").";
+  }
+}
+
 function renderRoster() {
   if (!tv.roster || tv.roster.length === 0) {
     $("roster-status").textContent = "No roster is available for this team yet.";
@@ -2238,7 +2362,9 @@ function renderRoster() {
 
   $("roster-body").innerHTML = players.map(function (p) {
     return "<tr><td>" + esc(p.jersey) + "</td>" +
-      '<td><button class="player-link" data-id="' + esc(p.id) + '">' + esc(p.name) + "</button></td>" +
+      '<td><span class="player-cell"><span class="avatar">' + esc(initialsOf(p.name)) +
+      (p.photo ? '<img src="' + esc(p.photo) + '" alt="" loading="lazy" draggable="false" data-hide>' : "") + "</span>" +
+      '<button class="player-link" data-id="' + esc(p.id) + '">' + esc(p.name) + "</button></span></td>" +
       "<td>" + esc(p.position) + "</td><td>" + esc(p.year) + "</td>" +
       '<td class="hide-sm">' + esc(p.height) + '</td><td class="hide-sm">' + esc(p.weight) + "</td>" +
       '<td class="hide-sm">' + esc(p.hometown) + "</td></tr>";
