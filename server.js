@@ -289,7 +289,8 @@ function publicUser(user) {
   }).filter(Boolean);
   return {
     username: user.username, favorites: user.favorites, blocked: blocked, admin: isAdmin(user),
-    email: user.emailVerified ? user.email : "", emailPending: user.pendingEmail || ""
+    email: user.emailVerified ? user.email : "", emailPending: user.pendingEmail || "",
+    needsEmail: !!(user.needsEmail && !user.emailVerified), emailRequired: !!user.needsEmail
   };
 }
 
@@ -343,6 +344,7 @@ async function signup(req, res, ip) {
     throw httpError(400, "Passwords must be 8 to 100 characters.");
   }
 
+  const signupEmail = fanSignupEmailCheck(body);
   const lower = username.toLowerCase();
   if (db.users.some(function (u) { return u.usernameLower === lower; })) {
     throw httpError(409, "That username is taken.");
@@ -368,6 +370,7 @@ async function signup(req, res, ip) {
     created: new Date().toISOString()
   };
   const recoveryCode = await setRecovery(user);
+  if (signupEmail) await fanSignupEmailAttach(user, signupEmail);
   db.users.push(user);
 
   const cookie = createSession(user.id);
@@ -419,7 +422,7 @@ async function login(req, res, ip) {
   const lower = String(body.username || "").trim().toLowerCase();
   const password = String(body.password || "");
 
-  const user = db.users.find(function (u) { return u.usernameLower === lower; });
+  const user = findFanUser(lower);
 
   // Always hash, so a missing username takes about as long as a wrong password
   const salt = user ? user.salt : "00000000000000000000000000000000";
@@ -684,7 +687,7 @@ async function handleFan(req, res, url) {
     case "GET /fan/messages":
       return getMessages(url, res, requireUser(user));
     case "POST /fan/messages":
-      return postMessage(req, res, requireUser(user));
+      return postMessage(req, res, requireEmailOk(requireUser(user)));
     case "POST /fan/delete":
       return deleteMessage(req, res, requireUser(user));
     case "POST /fan/report":
@@ -884,6 +887,33 @@ function fanClearReset(user) {
   user.resetHash = ""; user.resetSalt = ""; user.resetExp = 0;
 }
 
+// Sign-up needs an email whenever email sending is set up
+function fanSignupEmailCheck(body) {
+  if (!mailReady) return "";
+  const email = cleanEmail(body.email);
+  if (db.users.some(function (u) { return u.emailVerified && u.email === email; })) {
+    throw httpError(409, "That email already has an account. Log in, or use Forgot to reset your password.");
+  }
+  return email;
+}
+
+async function fanSignupEmailAttach(user, email) {
+  const code = shortCode();
+  user.needsEmail = true;
+  user.pendingEmail = email;
+  user.pendingSalt = crypto.randomBytes(8).toString("hex");
+  user.pendingHash = sha256(user.pendingSalt + code);
+  user.pendingExp = Date.now() + 30 * 60000;
+  sendMail(email, "Confirm your email for HBCU Surge Fan Talk",
+    "Welcome to Fan Talk. Your code to confirm this email is:\n\n    " + code + "\n\nIt works for 30 minutes. Enter it on Fan Talk to start posting.\n\nIf you didn't sign up, ignore this email." + emailFooter().replace("/recruiting", "/fan-talk").replace("Recruiting page", "Fan Talk page"));
+}
+
+// New accounts must confirm their email before they can post
+function requireEmailOk(user) {
+  if (user.needsEmail && !user.emailVerified) throw httpError(403, "Please confirm your email first. Check your inbox for the code, then enter it under \"Email for password resets\".");
+  return user;
+}
+
 async function fanEmailStart(req, res, user) {
   if (!mailReady) throw httpError(503, "Email isn't set up on this site yet.");
   if (limited("femail:" + user.id, 5, 3600000)) throw httpError(429, "Too many tries. Please try again in an hour.");
@@ -930,6 +960,7 @@ async function fanEmailRemove(req, res, user) {
   }
   const attempt = await scrypt(String(b.password || ""), user.salt, 64);
   if (!crypto.timingSafeEqual(attempt, Buffer.from(user.hash, "hex"))) throw httpError(401, "That password isn't right.");
+  if (user.needsEmail) throw httpError(400, "An email is required for your account. You can't remove it.");
   user.email = ""; user.emailVerified = false;
   user.pendingEmail = ""; user.pendingHash = ""; user.pendingSalt = ""; user.pendingExp = 0;
   fanClearReset(user);
