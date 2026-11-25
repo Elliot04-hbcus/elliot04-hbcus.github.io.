@@ -805,12 +805,12 @@ var CONFIG = {
     { name: "Arkansas-Pine Bluff", conf: "SWAC" },
     { name: "Bethune-Cookman", conf: "SWAC" },
     { name: "Florida A&M", conf: "SWAC" },
-    { name: "Grambling State", conf: "SWAC", aliases: ["Grambling"] },
+    { name: "Grambling State", conf: "SWAC", espn: "2755", aliases: ["Grambling"] },
     { name: "Jackson State", conf: "SWAC" },
     { name: "Mississippi Valley State", conf: "SWAC" },
-    { name: "Prairie View A&M", conf: "SWAC" },
-    { name: "Southern", conf: "SWAC" },
-    { name: "Texas Southern", conf: "SWAC" },
+    { name: "Prairie View A&M", conf: "SWAC", espn: "2504" },
+    { name: "Southern", conf: "SWAC", espn: "2582" },
+    { name: "Texas Southern", conf: "SWAC", espn: "2640" },
     { name: "Coppin State", conf: "MEAC", noFootball: true },
     { name: "Delaware State", conf: "MEAC" },
     { name: "Howard", conf: "MEAC" },
@@ -818,7 +818,7 @@ var CONFIG = {
     { name: "Morgan State", conf: "MEAC" },
     { name: "Norfolk State", conf: "MEAC" },
     { name: "North Carolina Central", conf: "MEAC", aliases: ["NC Central"] },
-    { name: "South Carolina State", conf: "MEAC", aliases: ["SC State"] }
+    { name: "South Carolina State", conf: "MEAC", espn: "2569", aliases: ["SC State"] }
   ]
 };
 
@@ -1308,6 +1308,7 @@ function fallbackTeamList(sport) {
         fullName: t.name,
         conf: t.conf,
         color: "",
+        logo: t.espn ? imgSrc("https://a.espncdn.com/i/teamlogos/ncaa/500/" + t.espn + ".png") : "",
         aliases: [t.name].concat(t.aliases || []),
         fallback: true
       };
@@ -1487,6 +1488,31 @@ function toPlayer(a) {
     hometown: [birth.city, birth.state].filter(Boolean).join(", "),
     photo: imgSrc(a.headshot && a.headshot.href)
   };
+}
+
+// Coaching staffs typed in by hand (coaches.json). Used instead of the feed when a team has one.
+var staffFile = null;
+async function staffFor(sport, team) {
+  if (!USE_SERVER) return null;
+  if (!staffFile) {
+    try {
+      var response = await fetch("/api/staff");
+      staffFile = response.ok ? await response.json() : {};
+    } catch (error) { staffFile = {}; }
+  }
+  var group = staffFile[sport];
+  if (!group || typeof group !== "object") return null;
+  var wanted = [team.name, team.fullName].concat(team.aliases || []).filter(Boolean).map(normalize);
+  var keys = Object.keys(group);
+  for (var i = 0; i < keys.length; i++) {
+    var list = group[keys[i]];
+    if (Array.isArray(list) && list.length > 0 && wanted.indexOf(normalize(keys[i])) !== -1) {
+      return list.filter(function (c) { return c && c.name; }).map(function (c) {
+        return { name: String(c.name), role: String(c.title || c.role || "Coach"), photo: "" };
+      });
+    }
+  }
+  return null;
 }
 
 // A team's coaches, read from the same team data as the roster
@@ -2326,7 +2352,8 @@ async function loadCoachesTab() {
   try {
     var ready = await resolveTeam(team);
     if (request !== tv.coachRequest || tv.team !== team) return;
-    var coaches = await loadCoaches(state.sport, ready.id);
+    var coaches = await staffFor(state.sport, team);
+    if (!coaches) coaches = await loadCoaches(state.sport, ready.id);
     if (request !== tv.coachRequest || tv.team !== team) return;
 
     if (coaches.length === 0) {
