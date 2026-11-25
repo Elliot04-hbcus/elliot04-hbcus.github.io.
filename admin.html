@@ -327,6 +327,15 @@ label.field input {
     <div id="r-pending"></div></section>
   <section class="card"><h2>Recruiting: reported conversations</h2><div id="r-reports"></div></section>
   <section class="card"><h2>Recruiting: all accounts</h2><div id="r-people"></div></section>
+  <section class="card"><h2>Recruiting: browse profiles</h2>
+    <p>Read-only view of every player profile and coach account, including ones that are pending or hidden.</p>
+    <div class="btn-row" style="margin-bottom:0.6rem">
+      <button class="btn" id="dir-tab-players" type="button">Players</button>
+      <button class="btn btn-plain" id="dir-tab-coaches" type="button">Coaches</button>
+    </div>
+    <input id="dir-search" type="search" placeholder="Search name, school, username or sport" aria-label="Search profiles" style="width:100%;max-width:26rem;margin-bottom:0.8rem">
+    <div id="dir-list"></div>
+  </section>
 </div>
 </main>
 
@@ -472,6 +481,45 @@ document.addEventListener("click", function (event) {
   });
 });
 rload();
+</script>
+<script>
+var dirData = { players: [], coaches: [] }, dirTab = "players";
+function dline(label, value) { return value || value === 0 ? "<tr><td><b>" + esc(label) + "</b></td><td>" + esc(value) + "</td></tr>" : ""; }
+function dplayer(p) {
+  var pr = p.profile, rows = dline("Site username", p.username) + dline("Status", p.status) + dline("Age group", p.minor ? "Under 18 (born " + p.birthYear + ")" : "18 or older (born " + p.birthYear + ")") +
+    dline("Level", p.level) + dline("Sport / class", p.sport + " / " + p.gradYear) + dline("School", p.hsSchool + ", " + p.city + ", " + p.state);
+  if (p.guardian) rows += dline("Guardian", p.guardian.name + " (" + p.guardian.relationship + ")") + dline("Guardian phone", p.guardian.phone) + dline("Guardian email", p.guardian.email);
+  if (pr) {
+    rows += dline("Shown to coaches", pr.active ? "Yes" : "No (hidden)") + dline("Messages allowed", pr.allowMessages ? "Yes" : "No") + dline("Profile complete", pr.complete + "%") +
+      dline("Position", [pr.position, pr.position2].filter(Boolean).join(" / ")) + dline("Height / weight", (pr.height || "?") + " / " + (pr.weight || "?")) + dline("Club", pr.club) +
+      dline("GPA", pr.gpa) + dline("SAT / ACT", [pr.sat, pr.act].filter(Boolean).join(" / ")) + dline("Major", pr.major) +
+      dline("Measurables", Object.keys(pr.measurables).map(function (k) { return k + ": " + pr.measurables[k]; }).join(", ")) +
+      dline("Stats", pr.stats.map(function (r) { return r.season + " " + r.line; }).join("; ")) +
+      dline("Offers", pr.offers.map(function (o) { return o.school + " (" + o.status + ")"; }).join(", ")) + dline("Committed to", pr.committedTo) + dline("About", pr.bio) +
+      (pr.highlightUrl ? "<tr><td><b>Highlights</b></td><td><a href=\"" + esc(pr.highlightUrl) + "\" target=\"_blank\" rel=\"noopener noreferrer\">" + esc(pr.highlightUrl) + "</a></td></tr>" : "");
+  } else rows += dline("Profile", "Not created yet");
+  return '<div class="card" style="margin-bottom:0.8rem;box-shadow:none;border:1px solid var(--line)"><h3>' + esc(p.fullName) + '</h3><div class="admin-scroll"><table class="admin-table"><tbody>' + rows + "</tbody></table></div></div>";
+}
+function dcoach(c) {
+  var rows = dline("Site username", c.username) + dline("Status", c.status) + dline("School", c.teamName) + dline("Title", c.title) + dline("Sports", c.sports.join(", ")) + dline("School email", c.schoolEmail) +
+    (c.staffUrl ? "<tr><td><b>Staff page</b></td><td><a href=\"" + esc(c.staffUrl) + "\" target=\"_blank\" rel=\"noopener noreferrer\">" + esc(c.staffUrl) + "</a></td></tr>" : "");
+  return '<div class="card" style="margin-bottom:0.8rem;box-shadow:none;border:1px solid var(--line)"><h3>' + esc(c.fullName) + '</h3><div class="admin-scroll"><table class="admin-table"><tbody>' + rows + "</tbody></table></div></div>";
+}
+function dirDraw() {
+  var q = $("dir-search").value.trim().toLowerCase();
+  var list = dirData[dirTab].filter(function (x) { return !q || JSON.stringify(x).toLowerCase().indexOf(q) !== -1; });
+  $("dir-tab-players").className = "btn" + (dirTab === "players" ? "" : " btn-plain");
+  $("dir-tab-coaches").className = "btn" + (dirTab === "coaches" ? "" : " btn-plain");
+  $("dir-list").innerHTML = list.length === 0 ? "<p>Nothing to show.</p>" : "<p>" + list.length + " shown</p>" + list.map(dirTab === "players" ? dplayer : dcoach).join("");
+}
+function dirLoad() {
+  fetch("/recruit/admin/directory").then(function (r) { if (!r.ok) throw new Error(""); return r.json(); }).then(function (d) { dirData = d; dirDraw(); })
+    .catch(function () { $("dir-list").innerHTML = "<p>Could not load. Log in on Fan Talk with an admin account.</p>"; });
+}
+$("dir-tab-players").addEventListener("click", function () { dirTab = "players"; dirDraw(); });
+$("dir-tab-coaches").addEventListener("click", function () { dirTab = "coaches"; dirDraw(); });
+$("dir-search").addEventListener("input", dirDraw);
+dirLoad();
 </script>
 </body>
 </html>
