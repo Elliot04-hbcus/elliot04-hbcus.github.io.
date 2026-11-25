@@ -413,9 +413,11 @@ label.field small { font-weight: 400; color: var(--muted); }
 
     <form id="rr-form" novalidate hidden>
       <h3>Reset your password</h3>
-      <p class="muted">Enter the recovery code you were shown when you created your account.</p>
+      <p class="muted">Type your email, then tap <strong>Email me a code</strong>. Or use the recovery code you were shown when you created your account.</p>
       <label class="field">Email<input id="rr-email" type="email" maxlength="120" autocomplete="email"></label>
-      <label class="field">Recovery code<input id="rr-code" maxlength="40" autocomplete="off"></label>
+      <p><button class="btn btn-plain" id="rr-send" type="button">Email me a code</button></p>
+      <p class="rc-ok" id="rr-info" role="status"></p>
+      <label class="field">Emailed code or recovery code<input id="rr-code" maxlength="40" autocomplete="off"></label>
       <label class="field">New password<input id="rr-pass" type="password" maxlength="100" autocomplete="new-password"></label>
       <button class="btn btn-wide" type="submit">Reset password</button>
       <p class="error" id="rr-err" role="alert"></p>
@@ -1113,6 +1115,12 @@ $("rs-form").addEventListener("submit", async function (e) {
   if (!r.ok) { $("rs-err").textContent = r.data.error || "Could not create the account."; return; }
   $("rs-pass").value = "";
   showCode(r.data.recoveryCode);
+});
+$("rr-send").addEventListener("click", async function () {
+  $("rr-err").textContent = ""; $("rr-info").textContent = "";
+  var r = await api("/recruit/forgot", { email: $("rr-email").value });
+  if (r.ok) $("rr-info").textContent = "If that email has an account, a code is on its way. It can take a minute. Check your spam folder too.";
+  else $("rr-err").textContent = r.data.error || "Could not send the email.";
 });
 $("rr-form").addEventListener("submit", async function (e) {
   e.preventDefault();
